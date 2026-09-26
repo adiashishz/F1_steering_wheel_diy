@@ -1,0 +1,6 @@
+packages:
+  - protocol
+  - tablet
+  - mock-esp32
+allowBuilds:
+  esbuild: true

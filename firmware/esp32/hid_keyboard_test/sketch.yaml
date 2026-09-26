@@ -1,0 +1,6 @@
+# Same board as serial_hello, but the native USB port now runs TinyUSB:
+#   USBMode=default   USB-OTG (TinyUSB) → the port can be a keyboard
+#   CDCOnBoot=cdc     plus a USB serial channel alongside it, for the key log
+# Uploading: use the BOOT/RST routine in ../README.md (the chip's own upload mode still works over this port).
+default_fqbn: esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,USBMode=default,CDCOnBoot=cdc
+default_port: /dev/ttyACM0

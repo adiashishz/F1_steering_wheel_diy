@@ -1,0 +1,45 @@
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+
+  /* This is a controller, not a web page. Kill every browser gesture:
+     - touch-action: none   → no scroll / pan / pinch-zoom, no gesture delay
+     - overscroll-behavior  → no pull-to-refresh, no rubber-band bounce
+     - user-select / callout → no text selection or iOS long-press menu   */
+  touch-action: none;
+  overscroll-behavior: none;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

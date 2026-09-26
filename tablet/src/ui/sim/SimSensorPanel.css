@@ -1,0 +1,109 @@
+.sim {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 12px;
+  padding: 14px;
+  height: 100%;
+  min-height: 0;
+}
+
+.sim__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.sim__title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sim__hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* drag pad — square, as big as the space allows */
+.sim__pad {
+  position: relative;
+  justify-self: center;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 1;
+  min-height: 160px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at center, var(--panel-2) 0%, var(--panel) 70%);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.sim__axis {
+  position: absolute;
+  background: var(--border);
+}
+.sim__axis--x { left: 0; right: 0; top: 50%; height: 1px; }
+.sim__axis--y { top: 0; bottom: 0; left: 50%; width: 1px; }
+
+.sim__edge {
+  position: absolute;
+  font-size: 11px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.sim__edge--l { left: 8px; top: calc(50% + 6px); }
+.sim__edge--r { right: 8px; top: calc(50% + 6px); }
+.sim__edge--t { top: 8px; left: calc(50% + 8px); }
+.sim__edge--b { bottom: 8px; left: calc(50% + 8px); }
+
+.sim__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: var(--info);
+  box-shadow: 0 0 0 4px #38bdf833;
+  pointer-events: none;
+}
+
+/* sliders */
+.sim__sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sim__slider {
+  display: grid;
+  grid-template-columns: 56px 1fr 64px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.sim__slider input {
+  width: 100%;
+  accent-color: var(--info);
+}
+.sim__value {
+  text-align: right;
+  color: var(--text);
+}
+
+.sim__btn {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  cursor: pointer;
+}
+.sim__btn:active {
+  background: var(--border);
+}

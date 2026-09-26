@@ -1,0 +1,150 @@
+.shell {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--gap);
+  padding: max(var(--pad), env(safe-area-inset-top)) max(var(--pad), env(safe-area-inset-right))
+    max(var(--pad), env(safe-area-inset-bottom)) max(var(--pad), env(safe-area-inset-left));
+}
+
+/* header */
+.shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+}
+.shell__title {
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  font-size: 14px;
+}
+.shell__title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  margin-right: 10px;
+  vertical-align: -2px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.shell__pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* body */
+.shell__body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: var(--gap);
+  min-height: 0;
+}
+.shell__drive {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.shell__col {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(150px, 34%);
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* footer */
+.shell__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.shell__mode {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.placeholder {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* status pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 12px;
+}
+.pill__label {
+  color: var(--text-muted);
+}
+.pill--go .pill__value { color: var(--go); }
+.pill--warn .pill__value { color: var(--warn); }
+.pill--bad .pill__value { color: var(--accent); }
+.pill--dim .pill__value { color: var(--text-dim); }
+
+/* narrower screens: telemetry drops under, then tuning drops under the gyro */
+@media (max-width: 1100px) {
+  .shell__body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 40%);
+  }
+}
+@media (max-width: 760px) {
+  .shell {
+    height: auto;
+    min-height: 100%;
+  }
+  html,
+  body {
+    overflow-y: auto;
+    touch-action: pan-y;
+  }
+  .shell__body {
+    grid-template-rows: auto auto;
+  }
+  .shell__drive {
+    grid-template-columns: 1fr;
+  }
+  .shell__col {
+    grid-template-rows: 420px 200px;
+  }
+}
+
+/* portrait: a controller held sideways — ask the user to rotate */
+.rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate-hint {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    z-index: 100;
+  }
+}

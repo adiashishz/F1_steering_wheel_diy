@@ -1,0 +1,33 @@
+/* Design tokens. Every color / size in the app comes from here. */
+:root {
+  /* surfaces */
+  --bg: #0a0d12;
+  --panel: #121720;
+  --panel-2: #181f2b;
+  --border: #232c3a;
+  --border-strong: #34405280;
+
+  /* text */
+  --text: #e6edf7;
+  --text-muted: #8b97a8;
+  --text-dim: #5b6676;
+
+  /* signal colors */
+  --accent: #e10600;        /* F1 red — brake, danger, DISARM */
+  --accent-soft: #e1060026;
+  --go: #22c55e;            /* throttle, connected, armed */
+  --go-soft: #22c55e26;
+  --warn: #f59e0b;          /* stale, degraded */
+  --info: #38bdf8;          /* steering, neutral telemetry */
+
+  /* type */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  /* sizing — touch targets never smaller than 56px */
+  --touch-min: 56px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --gap: 12px;
+  --pad: 16px;
+}

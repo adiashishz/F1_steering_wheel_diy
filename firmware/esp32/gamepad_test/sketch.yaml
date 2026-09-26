@@ -1,0 +1,3 @@
+# Same board settings as the keyboard tests: TinyUSB on the native port, plus a serial log channel.
+default_fqbn: esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,USBMode=default,CDCOnBoot=cdc
+default_port: /dev/ttyACM0

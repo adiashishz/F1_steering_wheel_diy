@@ -1,0 +1,7 @@
+# Board settings for the ESP32-S3 N16R8, so `arduino-cli compile --upload` needs no flags.
+#   FlashSize=16M       N16 = 16 MB flash (default assumes 4 MB)
+#   PSRAM=opi           R8  = 8 MB octal PSRAM (default is off)
+#   USBMode=hwcdc       native USB port acts as serial + JTAG (upload works over it)
+#   CDCOnBoot=cdc       Serial.print goes out the native USB port
+default_fqbn: esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,USBMode=hwcdc,CDCOnBoot=cdc
+default_port: /dev/ttyACM0

@@ -1,0 +1,5 @@
+# Same settings as hid_keyboard_test: keyboard + USB serial log on the native port.
+# If the PS5 does NOT recognise the board, retry with the serial channel off (keyboard only):
+#   arduino-cli compile --upload --fqbn esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,USBMode=default,CDCOnBoot=default firmware/esp32/ps5_drive_test
+default_fqbn: esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,USBMode=default,CDCOnBoot=cdc
+default_port: /dev/ttyACM0
