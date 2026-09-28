@@ -175,19 +175,19 @@ One piece at a time, stop after each. Each piece is 1–4 files and has its own 
 - [ ] 4.2 `KeyStateView` + key-event log
 
 **Phase 5 — touch drive screen** (check: mouse/multi-touch pedals, nothing sticks)
-- [ ] 5.1 `touchState.ts` + `releaseGuards.ts`
-- [ ] 5.2 `usePedalPointer` + `PedalPad` (analog 0..1)
+- [x] 5.1 `touchState.ts` + `releaseGuards.ts` (2026-09-26, lock-test slice)
+- [ ] 5.2 `usePedalPointer` + `PedalPad` (analog 0..1) — digital hold pads exist in `ui/drive/PedalPad.tsx`
 - [ ] 5.3 `useButtonPointer` + `ActionButton` (hold / toggle)
 - [ ] 5.4 `DriveScreen` layout + `keyboardSim` (WASD on desktop)
 
 **Phase 6 — fake ESP32 + network** (check: `pnpm dev:all`, both sides show ~100 Hz)
-- [ ] 6.1 mock `server.ts` + `session.ts` handshake + `metrics.ts`
+- [x] 6.1 mock server + `session.ts` handshake + metrics (`mock-esp32/src/{index,session,log}.ts`)
 - [ ] 6.2 mock `dashboard.ts` — the §18 terminal view
-- [ ] 6.3 tablet `Transport` + `WebSocketTransport` + ping/latency
-- [ ] 6.4 `WebSocketOutput` + connection pill + server URL field
+- [x] 6.3 tablet transport + ping/latency — merged into `WebSocketOutput` for now
+- [x] 6.4 `WebSocketOutput` + connection pill (URL via `?esp=`, no field yet)
 
 **Phase 7 — safety / reliability** (check: kill server while holding throttle → all keys released)
-- [ ] 7.1 server watchdog → release all keys
+- [x] 7.1 server watchdog → release all keys (mock; tablet reconnects + disarms on a trip)
 - [ ] 7.2 tablet reconnect with backoff + link watchdog
 - [ ] 7.3 stale-packet rejection (sessionId / seq)
 - [ ] 7.4 `ArmingMachine` + ARM/DISARM strip + disconnect banner
@@ -200,9 +200,9 @@ One piece at a time, stop after each. Each piece is 1–4 files and has its own 
 - [ ] 8.4 Save / defaults / reset calibration / reset all / export-import
 
 **Phase 9 — real gyro** (check: DevTools → Sensors drives steering)
-- [ ] 9.1 `orientationMath.ts` — angles → roll/pitch without the 90° flip
-- [ ] 9.2 `DeviceOrientationSource` + permission flow
-- [ ] 9.3 `capabilities.ts` + `SourcePicker` + auto-fallback to fake gyro
+- [x] 9.1 `orientationMath.ts` — angles → roll/pitch without the 90° flip
+- [x] 9.2 `DeviceOrientationSource` + permission flow
+- [ ] 9.3 `capabilities.ts` + `SourcePicker` + auto-fallback to fake gyro — basic `SensorSwitch` + "Use tablet gyro" button done
 
 **Phase 10 — modes + calibration** (check: A/B/C behave differently; B won't arm uncalibrated)
 - [ ] 10.1 three mappers + registry + `ModeBadge`
@@ -230,8 +230,10 @@ One piece at a time, stop after each. Each piece is 1–4 files and has its own 
 
 - [x] P.1 ❌ **FAILED 2026-09-24** — F1 25 follows each pulse: the wheel visibly shakes, unplayable. Keyboard stays on/off only. Keyboard **pulse mode** (`firmware/esp32/pulse_steer_test/`): pulse "." at 25/50/75% duty, period 80 ms and 160 ms (≥ 20 ms on/off). Does F1 25's steering settle part-way? PASS → build pulse mode into `keymap.ts` (the `analogEmulation` seam) · FAIL → Access Controller + digital pot
 
+- [ ] L.1 **Live lock test** (2026-09-26 build): tablet gyro / hold-chips → `wheel_link` ESP32 → pulsed steer key, tuned live (mode hold / pwm / sigma, period 10–200 ms, shortest press 4–50 ms). P.1 only tried 80/160 ms periods; the ESP32's keyboard polls at 1 ms, so shorter pulses reach the PS5. PASS → some setting gives steady part-way lock without visible shake · FAIL → keyboard steering is on/off, go analog (Access Controller). Runbook: README *Live lock test*.
+
 *Part 2: the real firmware — after Phase 7 AND only if F.3 passed.* Mirrors the mock server, which by then is a tested spec.
-- [ ] F.4 Wi-Fi + WebSocket server, `hello` / `hello_ack` handshake
+- [ ] F.4 Wi-Fi + WebSocket server, `hello` / `hello_ack` handshake — written early for L.1 (`firmware/esp32/wheel_link/`), compiles, not yet run on hardware
 - [ ] F.5 Port `codec.ts` validation + session states (PENDING → AWAITING_FRESH → LIVE)
 - [ ] F.6 Port `keymap.ts` + `pedals.ts` → HID `pressRaw` / `releaseRaw`
 - [ ] F.7 Watchdog timer (150 ms → release all) + BOOT-button kill switch + `status` messages
@@ -283,4 +285,4 @@ Also worth doing by hand: DevTools Performance record of 5 s idle in phase 2 —
 
 ## Explicitly out of scope
 
-unit tests (math kept pure so they drop in later) · BLE transport · iPad-specific work beyond the iOS permission gesture · binary wire format · PWM analog-emulation over keyboard (the seam exists in `KeyStateMachine`, off by default, for a 5-minute A/B once hardware arrives).
+unit tests (math kept pure so they drop in later) · BLE transport · iPad-specific work beyond the iOS permission gesture · binary wire format · ~~PWM analog-emulation over keyboard~~ — now in `KeyStateMachine` (`steerPulse`, default `hold`) for L.1.

@@ -22,6 +22,8 @@ tests (Stages 1–3). Once the gate passes, the real firmware must mirror two fi
 
 | `pulse_steer_test/` | P.1 ❌ | Pulses "." at 25/50/75% duty (80 / 160 ms periods) to fake part-way steering |
 
+| `wheel_link/` | F.4–F.7 (experiment) | The real link: Wi-Fi WebSocket server (protocol v1) → `keymap.ts` port → USB keyboard. Not yet tested on hardware |
+
 **P.1 result (2026-09-24): FAILED.** F1 25 doesn't average the pulses. The wheel follows each one
 and shakes back and forth, which is unplayable. Keyboard steering on PS5 is on/off only.
 
@@ -46,6 +48,34 @@ F.2 result on Linux (2026-09-24): recognised as `USB HID v1.11 Keyboard`, output
 The doubled letters are the PC's own key repeat, which shows the key was held rather than tapped.
 
 Each sketch has a `sketch.yaml` holding its board settings, so no flags are needed.
+
+## wheel_link
+
+Tablet → Wi-Fi → ESP32 → USB keyboard. Implements `protocol/controller-state.md`; `key_machine.h`
+is a C++ port of `keymap.ts` + `pedals.ts` (cross-checked against the TS: identical key events over
+20k ticks in hold / pwm / sigma). Code is in `wheel_link_main.cpp`, not the `.ino` (see below).
+
+```bash
+cp firmware/esp32/wheel_link/secrets.example.h firmware/esp32/wheel_link/secrets.h   # fill in Wi-Fi (2.4 GHz); gitignored
+arduino-cli lib install "WebSockets@2.7.2" "ArduinoJson@7.4.3"   # Markus Sattler's WebSockets; these versions build on core 3.3.12
+arduino-cli compile firmware/esp32/wheel_link
+arduino-cli upload  -p /dev/cu.usbmodem… firmware/esp32/wheel_link   # BOOT/RST routine below
+arduino-cli monitor -p /dev/cu.usbmodem… -c baudrate=115200
+```
+
+- Tablet connects to `ws://wheel.local:8080` (mDNS) or `ws://<IP>:8080`. The IP is in the serial log.
+- Serial log: boot banner, Wi-Fi status + IP, client connect/disconnect, hello accepted,
+  `output_config` changes, watchdog trips, kill switch, and one summary line per second while a tablet is
+  connected (state, pkt/s, steering/throttle/brake, steer mode + duty, steer presses/s, held keys, dropped).
+  Individual key events are not logged.
+- **BOOT = kill switch**: releases every key, output stays off until the tablet sends a new `hello`.
+- Watchdog 150 ms: no valid `state` → everything released, `TRIPPED` until a new `hello`.
+- Only one tablet at a time. A new `hello` takes over (old session's keys released, old socket closed).
+
+**Why the code isn't in the `.ino`:** on the Mac, `~/Library/Arduino15/packages/builtin/tools/ctags/5.8-arduino11/ctags`
+is a symlink to universal-ctags. arduino-cli's prototype generator can't read its output and inserts broken
+prototypes (no return type), so any `.ino` that defines functions fails to compile (the older test sketches too).
+`.cpp` files skip that step.
 
 ## F1 25 on PS5 — "Keyboard Preset 1" default bindings
 

@@ -20,5 +20,7 @@ export class NullOutput implements OutputDevice {
     this.stats.releases++;
   }
 
+  configure(): void {}
+
   dispose(): void {}
 }

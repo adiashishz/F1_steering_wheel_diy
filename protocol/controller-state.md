@@ -89,6 +89,27 @@ change behaviour by mode).
 | `seq` | int ≥ 0 | starts at 0 each connection, counts up |
 | `timestamp` | ms | tablet clock, only used for ordering / latency |
 
+**`output_config`** — right after `hello_ack`, and again whenever the tablet's
+output settings change. Changing it must NOT release keys on its own.
+```json
+{
+  "type": "output_config", "version": 1,
+  "steerPulse": { "mode": "sigma", "periodMs": 40, "minPulseMs": 10, "fullAt": 0.95, "maxDuty": 1 }
+}
+```
+
+| Field | Range | Meaning |
+|---|---|---|
+| `mode` | `hold` · `pwm` · `sigma` | `hold` = key down past the threshold (full lock in F1 25) |
+| `periodMs` | 10 … 500 | `pwm` only: one on + off cycle |
+| `minPulseMs` | 4 … 100 | shortest press and shortest gap, in both pulse modes |
+| `fullAt` | 0.3 … 1 | `|steering|` at or above this → full duty; below, duty = `|steering|` / `fullAt` |
+| `maxDuty` | 0.05 … 1, optional (default 1) | duty at full steering: duty = min(`|steering|`/`fullAt`, 1) × `maxDuty`. 1 → held solid at full tilt |
+
+Until one arrives the ESP32 uses `hold`. The exact pulse algorithm is
+`KeyStateMachine.runPulser()` in `keymap.ts`. Pulses are timed on the ESP32
+(1 ms loop), never on the tablet, because Wi-Fi jitter would smear them.
+
 **`ping`** — every ~500 ms. `{ "type": "ping", "version": 1, "id": 7, "timestamp": 183020.1 }`
 
 **`bye`** — optional, on clean close. `{ "type": "bye", "version": 1, "reason": "user closed" }`
@@ -121,6 +142,9 @@ If `accepted` is false, include `reason` and close.
 }
 ```
 `lastSeq` is `-1` before any state has been accepted.
+Optional: `steerDuty` (0 … 1, the duty the steer key is pulsing at) and
+`steerPressesPerSec` (steer key presses in the last second). The 5 Hz `keys`
+snapshot can't show pulses; these two can.
 
 **`error`**
 ```json
@@ -148,7 +172,8 @@ These are safety rules, not suggestions (plan.md §13, §19).
    before mapping. A buggy tablet must not be able to hold throttle and brake.
 7. **Map state → keys with the same logic as `keymap.ts`**, same numbers:
    press > 0.15, release < 0.10, min hold 30 ms, min gap 20 ms.
-   `releaseAll` ignores min hold.
+   `releaseAll` ignores min hold. In the pulse steering modes the steer keys
+   skip min hold / min gap and follow `runPulser()` instead; tick it every 1 ms.
 8. **Disconnect → release every key**, immediately, not after the watchdog.
 9. **Physical stop:** a board button that disables all output (plan.md §19.7).
 
@@ -199,7 +224,7 @@ Firmware notes:
 | Setting | Value | Where |
 |---|---|---|
 | Send rate | 100 Hz | tablet |
-| Watchdog | 150 ms | ESP32 (`hello_ack.watchdogMs`) |
+| Watchdog | 300 ms (150 tripped on real Wi-Fi via the laptop proxy) | ESP32 (`hello_ack.watchdogMs`) |
 | Ping interval | 500 ms | tablet |
 | Status rate | ~5 Hz | ESP32 |
 | Key press / release thresholds | 0.15 / 0.10 | `keymap.ts` |

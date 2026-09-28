@@ -4,12 +4,13 @@
  *   FixedRateLoop tick
  *     → buildFrame(sensor)          read inputs
  *     → AxisProcessor ×2            roll → steering, pitch → pedal tilt (−1 brake … +1 throttle)
- *     → ControllerState             steering + throttle/brake (+ exclusivity)
+ *     → ControllerState             steering (or a held test chip) + touch pads (+ gyro pedals if on)
+ *                                   + exclusivity
  *     → output.send(state, armed)   the §15 seam — loopback now, ESP32 later
  *     → write LiveState + bump()    so the UI can show it
  *
- * Pedals come from gyro tilt for now. Touch pedals arrive in Phase 5, and the
- * three control modes (which input drives which pedal) in Phase 10.
+ * Pedals come from the touch pads, plus pitch when `pedals.gyro` is on. The
+ * three proper control modes (which input drives which pedal) come in Phase 10.
  *
  * Starts DISARMED (plan.md §19.1). While disarmed the state is still sent every
  * tick with armed=false, so the output stays in step and arming is instant.
@@ -35,6 +36,7 @@ import type { HotStore } from './hotStore';
 import { buildFrame, createFrame, DEFAULT_STALE_SENSOR_MS, type RawInputFrame } from './pipeline';
 import { IntervalStats, RateMeter } from './telemetry';
 import type { ConfigStore } from '../config/configStore';
+import { touchIsNeutral, type TouchState } from '../input/touchState';
 import type { OutputDevice } from '../output/OutputDevice';
 import type { SensorSource, SensorStatus } from '../sensors/types';
 
@@ -69,6 +71,13 @@ export interface LiveState {
   /** Pedal tilt before smoothing. */
   pedalTiltShaped: number;
 
+  /** A test chip is forcing the steering value. */
+  steerOverride: boolean;
+  /** Steering actually handed to the output: the gyro value, or the test chip's. */
+  steeringOut: number;
+  /** Disarmed by a link drop; re-arms once the link is back and nothing is pressed. */
+  rearmPending: boolean;
+
   /** What was actually handed to the output this tick (after exclusivity). */
   throttle: number;
   brake: number;
@@ -99,6 +108,9 @@ export function createLiveState(): LiveState {
     pedalTiltRaw: 0,
     pedalTilt: 0,
     pedalTiltShaped: 0,
+    steerOverride: false,
+    steeringOut: 0,
+    rearmPending: false,
     throttle: 0,
     brake: 0,
     armed: false,
@@ -111,6 +123,7 @@ export interface ControlLoopDeps {
   sensor: SensorSource;
   config: ConfigStore;
   output: OutputDevice;
+  touch: TouchState;
   live: HotStore<LiveState>;
   hz?: number;
   staleSensorMs?: number;
@@ -131,11 +144,20 @@ export class ControlLoop {
   private readonly unsubscribeConfig: () => void;
   /** Was the gyro fresh last tick? Used to spot "readings just came back". */
   private wasFresh = false;
+  /** Sensor id last tick — a change means the source was switched. */
+  private lastSensorId = '';
+  private gyroPedals: boolean;
 
   /** The one state object this loop owns and refills every tick. */
   private readonly state: ControllerState = createNeutralState();
   /** plan.md §19.1: start with every output released. */
   private armed = false;
+  /**
+   * The driver's choice. A link drop disarms but keeps this, and the loop
+   * re-arms by itself once the link is back AND nothing is pressed on screen —
+   * so a reconnect with a foot on the throttle can't mean instant full throttle.
+   */
+  private armIntent = false;
 
   constructor(deps: ControlLoopDeps) {
     this.deps = deps;
@@ -144,10 +166,16 @@ export class ControlLoop {
     const cfg = deps.config.get();
     this.steeringAxis = new AxisProcessor(cfg.steering);
     this.pitchAxis = new AxisProcessor(cfg.pitch);
+    this.gyroPedals = cfg.pedals.gyro;
+    deps.output.configure({ steerPulse: cfg.steerOutput });
     // Settings changes apply on the next tick. Each change is a new object, so just swap the reference.
-    this.unsubscribeConfig = deps.config.subscribe((next) => {
+    this.unsubscribeConfig = deps.config.subscribe((next, changed) => {
       this.steeringAxis.config = next.steering;
       this.pitchAxis.config = next.pitch;
+      this.gyroPedals = next.pedals.gyro;
+      if (changed === 'all' || changed.startsWith('steerOutput.')) {
+        deps.output.configure({ steerPulse: next.steerOutput });
+      }
     });
   }
 
@@ -183,8 +211,27 @@ export class ControlLoop {
    */
   setArmed(on: boolean): boolean {
     if (on && !this.deps.output.ready) return false;
+    this.armIntent = on;
     if (this.armed && !on) this.deps.output.releaseAll(performance.now(), 'disarmed');
     this.armed = on;
+    return true;
+  }
+
+  /** Disarmed by a link drop, waiting to re-arm (link back + nothing pressed). */
+  get rearmPending(): boolean {
+    return this.armIntent && !this.armed;
+  }
+
+  /**
+   * "The way I'm holding it now is straight": the current roll / pitch become zero.
+   * Refused (false) without a fresh gyro reading. Plan §9's averaged, hold-still
+   * capture replaces this in piece 10.2.
+   */
+  calibrateCenter(): boolean {
+    const f = this.frame;
+    if (!f.sensorFresh) return false;
+    this.steeringAxis.setCenter(f.roll);
+    this.pitchAxis.setCenter(f.pitch);
     return true;
   }
 
@@ -211,7 +258,10 @@ export class ControlLoop {
 
     // After a stall, or when readings return after a gap, forget old smoothing
     // so the output jumps to where the tablet IS instead of gliding from where it WAS.
-    if (stalled || (f.sensorFresh && !this.wasFresh)) {
+    // Same after switching sensor source.
+    const switched = sensor.id !== this.lastSensorId;
+    this.lastSensorId = sensor.id;
+    if (stalled || switched || (f.sensorFresh && !this.wasFresh)) {
       steer.reset();
       tilt.reset();
     }
@@ -236,20 +286,33 @@ export class ControlLoop {
 
     // ─── build ControllerState → hand to the output ──────────────────────────
     const output = this.deps.output;
+    const touch = this.deps.touch;
     const s = this.state;
-    s.steering = v.steering;
-    // Gyro pedals for now: one signed tilt → forward = throttle, back = brake.
-    s.throttle = v.pedalTilt > 0 ? v.pedalTilt : 0;
-    s.brake = v.pedalTilt < 0 ? -v.pedalTilt : 0;
+    for (const id in touch.buttons) s.buttons[id] = touch.buttons[id]!;
+    // A held test chip wins over the gyro: a fixed, repeatable steering value.
+    v.steerOverride = touch.steerOverride !== null;
+    s.steering = touch.steerOverride ?? v.steering;
+    // Touch pads always; gyro pedals (forward = throttle, back = brake) only if switched on.
+    const tiltThrottle = this.gyroPedals && v.pedalTilt > 0 ? v.pedalTilt : 0;
+    const tiltBrake = this.gyroPedals && v.pedalTilt < 0 ? -v.pedalTilt : 0;
+    s.throttle = Math.max(touch.throttle, tiltThrottle);
+    s.brake = Math.max(touch.brake, tiltBrake);
     enforceExclusivity(s, 'dominant', DEFAULT_EXCLUSIVITY_THRESHOLD);
 
     // If the output stops being ready (e.g. disconnect later), drop to disarmed.
-    if (this.armed && !output.ready) this.setArmed(false);
+    if (this.armed && !output.ready) {
+      this.armed = false; // keep armIntent: re-arm when the link returns
+      output.releaseAll(now, 'link lost');
+    } else if (this.rearmPending && output.ready && touchIsNeutral()) {
+      this.armed = true;
+    }
     output.send(s, now, this.armed);
 
+    v.steeringOut = s.steering;
     v.throttle = s.throttle;
     v.brake = s.brake;
     v.armed = this.armed;
+    v.rearmPending = this.rearmPending;
     v.outputId = output.id;
     v.outputReady = output.ready;
 

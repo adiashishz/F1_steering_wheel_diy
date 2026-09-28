@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { PROTOCOL_VERSION } from '@wheel/protocol';
 import { runtime } from './core/runtime';
 import { noteRender } from './core/telemetry';
@@ -8,18 +8,20 @@ import { SimSensorPanel } from './ui/sim/SimSensorPanel';
 import { TelemetryPanel } from './ui/debug/TelemetryPanel';
 import { AxisSettings } from './ui/settings/AxisSettings';
 import { AxisScope } from './ui/debug/AxisScope';
+import { DriveScreen } from './ui/drive/DriveScreen';
 import './App.css';
+
+type Tab = 'drive' | 'tune';
 
 /**
  *   ┌ header: title + status pills ─────────────────────────────┐
- *   │ fake gyro        │ tuning sliders   │ telemetry            │
- *   │ live graph       │                  │                      │
- *   └ footer: mode + actions ───────────────────────────────────┘
- *
- * Dev layout for now. Pedals and buttons take over the drive area in Phase 5.
+ *   │ Drive: pedals · steering meter · lock-test controls       │
+ *   │ Tune:  fake gyro + graph │ tuning sliders │ telemetry      │
+ *   └ footer: Drive / Tune tabs · ESP32 address ────────────────┘
  */
 export function App() {
   noteRender();
+  const [tab, setTab] = useState<Tab>('drive');
   return (
     <div className="shell">
       <header className="shell__header">
@@ -28,11 +30,16 @@ export function App() {
           <SensorPill />
           <LoopPill />
           <OutputPill />
-          <Pill label="ESP32" value="offline" tone="dim" />
+          <EspPill />
           <Pill label="Proto" value={`v${PROTOCOL_VERSION}`} tone="dim" />
         </div>
       </header>
 
+      {tab === 'drive' ? (
+        <main className="shell__body shell__body--drive">
+          <DriveScreen />
+        </main>
+      ) : (
       <main className="shell__body">
         <div className="shell__drive">
           <div className="shell__col">
@@ -51,10 +58,24 @@ export function App() {
           <TelemetryPanel />
         </aside>
       </main>
+      )}
 
       <footer className="shell__footer">
-        <span className="shell__mode">MODE: —</span>
-        <span className="placeholder">Calibrate · Settings — later phases</span>
+        <div className="tune__tabs" role="tablist">
+          {(['drive', 'tune'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              className="tune__tab"
+              onClick={() => setTab(t)}
+            >
+              {t === 'drive' ? 'Drive' : 'Tune'}
+            </button>
+          ))}
+        </div>
+        <span className="placeholder mono">{runtime.esp.link.url}</span>
       </footer>
 
       <div className="rotate-hint">Rotate to landscape</div>
@@ -89,6 +110,28 @@ function OutputPill() {
   const ready = useHzValue(runtime.live, 4, (v) => v.outputReady);
   const tone: Tone = !ready ? 'dim' : armed ? 'bad' : 'go';
   return <Pill label="Output" value={`${id || 'none'} · ${armed ? 'ARMED' : 'safe'}`} tone={tone} />;
+}
+
+/** ESP32 link state (re-renders on change) + round trip (written straight to the DOM). */
+function EspPill() {
+  noteRender();
+  const state = useHzValue(runtime.live, 4, () => runtime.esp.link.state);
+  const rtt = useRef<HTMLSpanElement>(null);
+  useRaf(runtime.live, () => {
+    const ms = runtime.esp.link.rttMs;
+    const text = state === 'live' ? (Number.isFinite(ms) ? ` · ${ms.toFixed(0)} ms` : '') : '';
+    if (rtt.current && rtt.current.textContent !== text) rtt.current.textContent = text;
+  });
+  const tone: Tone = state === 'live' ? 'go' : state === 'rejected' ? 'bad' : 'warn';
+  return (
+    <span className={`pill pill--${tone}`} title={runtime.esp.link.lastError}>
+      <span className="pill__label">ESP32</span>
+      <span className="pill__value mono">
+        {state}
+        <span ref={rtt} />
+      </span>
+    </span>
+  );
 }
 
 /** Updates every frame without re-rendering. */

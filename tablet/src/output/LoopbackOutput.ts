@@ -25,7 +25,7 @@ import {
   type KeyEvent,
   type KeyMapConfig,
 } from '@wheel/protocol';
-import { createOutputStats, type OutputDevice } from './OutputDevice';
+import { createOutputStats, type OutputDevice, type OutputOptions } from './OutputDevice';
 
 /** How many recent key events to keep for the UI. */
 const LOG_SIZE = 40;
@@ -81,6 +81,10 @@ export class LoopbackOutput implements OutputDevice {
     this.stats.releases++;
     this.wasArmed = false;
     this.record(this.machine.releaseAll(now));
+  }
+
+  configure(opts: OutputOptions): void {
+    this.machine.setSteerPulse(opts.steerPulse);
   }
 
   /** Newest last. Allocates — call from the UI, not the loop. */

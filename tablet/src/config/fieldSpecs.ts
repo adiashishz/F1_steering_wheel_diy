@@ -8,6 +8,7 @@
  * if a setting has no row, or a row has no setting.
  */
 
+import { STEER_PULSE_LIMITS } from '@wheel/protocol';
 import type { FieldPath, FieldValue } from './schema';
 
 export interface NumberFieldSpec {
@@ -29,10 +30,25 @@ export interface BoolFieldSpec {
   help?: string;
 }
 
-export type FieldSpec = NumberFieldSpec | BoolFieldSpec;
+/** Pick one of a fixed list of strings. */
+export interface EnumFieldSpec {
+  kind: 'enum';
+  label: string;
+  options: readonly { value: string; label: string }[];
+  default: string;
+  help?: string;
+}
 
-/** Numbers get a NumberFieldSpec, booleans a BoolFieldSpec — checked per path. */
-type SpecFor<V> = V extends number ? NumberFieldSpec : V extends boolean ? BoolFieldSpec : never;
+export type FieldSpec = NumberFieldSpec | BoolFieldSpec | EnumFieldSpec;
+
+/** Numbers get a NumberFieldSpec, booleans a BoolFieldSpec, string unions an EnumFieldSpec — checked per path. */
+type SpecFor<V> = [V] extends [number]
+  ? NumberFieldSpec
+  : [V] extends [boolean]
+    ? BoolFieldSpec
+    : [V] extends [string]
+      ? EnumFieldSpec
+      : never;
 type SpecTable = { [P in FieldPath]: SpecFor<FieldValue<P>> };
 
 export const FIELD_SPECS = {
@@ -91,6 +107,45 @@ export const FIELD_SPECS = {
   },
   'pitch.invert': {
     kind: 'bool', label: 'Invert pedals', default: false,
+  },
+
+  // ─── pedal source ──────────────────────────────────────────────────────────
+  'pedals.gyro': {
+    kind: 'bool', label: 'Gyro pedals (pitch)', default: false,
+    help: 'Off: throttle / brake come only from the touch pads.',
+  },
+
+  // ─── steer keys — the live lock test (limits shared with the ESP32) ────────
+  'steerOutput.mode': {
+    kind: 'enum', label: 'Steer keys',
+    options: [
+      { value: 'hold', label: 'Hold' },
+      { value: 'pwm', label: 'PWM' },
+      { value: 'sigma', label: 'Sigma' },
+    ],
+    // PWM by default while the lock test is what this build is for.
+    default: 'pwm',
+    help: 'Hold = on/off (full lock). PWM / Sigma pulse the key to try for part-way lock.',
+  },
+  'steerOutput.periodMs': {
+    kind: 'number', label: 'PWM period', unit: 'ms',
+    min: STEER_PULSE_LIMITS.periodMs.min, max: STEER_PULSE_LIMITS.periodMs.max, step: 5, default: 40,
+    help: 'One on + off cycle. Shorter = less shake, if the game keeps up.',
+  },
+  'steerOutput.minPulseMs': {
+    kind: 'number', label: 'Shortest press / gap', unit: 'ms',
+    min: STEER_PULSE_LIMITS.minPulseMs.min, max: 50, step: 1, default: 10,
+    help: 'Pulses shorter than a game frame (~17 ms at 60 fps) may be missed.',
+  },
+  'steerOutput.fullAt': {
+    kind: 'number', label: 'Solid hold from', unit: '',
+    min: STEER_PULSE_LIMITS.fullAt.min, max: STEER_PULSE_LIMITS.fullAt.max, step: 0.01, default: 0.95,
+    help: 'Steering at or past this gets full duty. Duty = steering ÷ this.',
+  },
+  'steerOutput.maxDuty': {
+    kind: 'number', label: 'Max duty', unit: '',
+    min: STEER_PULSE_LIMITS.maxDuty.min, max: STEER_PULSE_LIMITS.maxDuty.max, step: 0.01, default: 1,
+    help: 'Key-on share at full tilt. Lower it if the wheel still pins to full lock.',
   },
 } as const satisfies SpecTable;
 

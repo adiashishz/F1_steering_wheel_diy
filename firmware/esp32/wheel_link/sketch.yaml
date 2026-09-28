@@ -1,0 +1,3 @@
+# Same board settings as the keyboard tests: TinyUSB keyboard + serial log on the native port.
+# No default_port: pass it with -p (macOS: /dev/cu.usbmodem…).
+default_fqbn: esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,USBMode=default,CDCOnBoot=cdc
