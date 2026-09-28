@@ -8,14 +8,22 @@
  * Implementations:
  *   NullOutput       drops everything (safe default)
  *   LoopbackOutput   runs the real key logic in the browser — no server, no ESP32
- *   WebSocketOutput  sends to the ESP32 (Phase 6)
+ *   WebSocketOutput  sends to the ESP32 (or the mock server)
  *   later, if ever:  GamepadOutput, AccessControllerOutput
  *
  * Swapping one for another is a one-line change in core/runtime.ts. Nothing
  * before this point knows which one is plugged in.
  */
 
-import type { ControllerState } from '@wheel/protocol';
+import type { ControllerState, SteerPulseConfig } from '@wheel/protocol';
+
+/**
+ * Output-side tuning pushed down from settings. Keyboard-specific on purpose —
+ * outputs that don't care (null, a future gamepad) just ignore it.
+ */
+export interface OutputOptions {
+  steerPulse: SteerPulseConfig;
+}
 
 export interface OutputStats {
   /** send() calls accepted. */
@@ -43,6 +51,9 @@ export interface OutputDevice {
 
   /** Release everything immediately. Idempotent — safe to call repeatedly. */
   releaseAll(now: number, reason: string): void;
+
+  /** Apply output tuning. Called once at start and on every settings change. */
+  configure(opts: OutputOptions): void;
 
   dispose(): void;
 }

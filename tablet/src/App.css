@@ -64,6 +64,11 @@
   overflow: hidden;
 }
 
+/* the drive screen takes the whole body */
+.shell__body--drive {
+  grid-template-columns: 1fr;
+}
+
 /* footer */
 .shell__footer {
   display: flex;
@@ -105,7 +110,7 @@
 
 /* narrower screens: telemetry drops under, then tuning drops under the gyro */
 @media (max-width: 1100px) {
-  .shell__body {
+  .shell__body:not(.shell__body--drive) {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) minmax(0, 40%);
   }

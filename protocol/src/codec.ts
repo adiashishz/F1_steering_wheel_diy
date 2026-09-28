@@ -12,6 +12,7 @@
  */
 
 import { isCompatible } from './version';
+import { STEER_MODES, STEER_PULSE_LIMITS } from './keymap';
 import {
   CONTROL_MODES,
   ERROR_CODES,
@@ -122,6 +123,18 @@ function boolRecord(v: unknown): boolean {
   return true;
 }
 
+function steerPulse(v: unknown): boolean {
+  if (!isObj(v)) return false;
+  const L = STEER_PULSE_LIMITS;
+  return (
+    oneOf(STEER_MODES)(v.mode) &&
+    inRange(L.periodMs.min, L.periodMs.max)(v.periodMs) &&
+    inRange(L.minPulseMs.min, L.minPulseMs.max)(v.minPulseMs) &&
+    inRange(L.fullAt.min, L.fullAt.max)(v.fullAt) &&
+    optional(inRange(L.maxDuty.min, L.maxDuty.max))(v.maxDuty)
+  );
+}
+
 function strArray(v: unknown): boolean {
   return Array.isArray(v) && v.length <= MAX_BUTTONS && v.every(idStr);
 }
@@ -146,6 +159,9 @@ const CLIENT_RULES: Record<ClientMessage['type'], Rules> = {
     throttle: inRange(0, 1),
     brake: inRange(0, 1),
     buttons: boolRecord,
+  },
+  output_config: {
+    steerPulse,
   },
   ping: {
     id: nonNegInt,
@@ -177,6 +193,8 @@ const SERVER_RULES: Record<ServerMessage['type'], Rules> = {
     outputArmed: isBool,
     watchdogTripped: isBool,
     keys: boolRecord,
+    steerDuty: optional(inRange(0, 1)),
+    steerPressesPerSec: optional((v) => isNum(v) && v >= 0),
   },
   error: {
     code: oneOf(ERROR_CODES),

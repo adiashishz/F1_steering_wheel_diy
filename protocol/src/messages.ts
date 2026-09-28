@@ -10,6 +10,7 @@
  *   tablet ──hello──►  ESP32         "I'm connecting, here's who I am"
  *   tablet ◄─hello_ack─ ESP32        "accepted, here are my limits"
  *   tablet ──state──►  ESP32         100×/sec: what the driver is doing
+ *   tablet ──output_config──► ESP32  on connect + on change: how to turn steering into keys
  *   tablet ──ping───►  ESP32   ──┐
  *   tablet ◄─pong──── ESP32   ◄─┘   round trip = latency
  *   tablet ◄─status── ESP32          ~5×/sec: what the ESP32 is actually pressing
@@ -18,6 +19,7 @@
  */
 
 import type { ActionId } from './controllerState';
+import type { SteerPulseConfig } from './keymap';
 
 /** The three ways inputs can be mapped (plan.md §11). */
 export type ControlMode = 'touch-pedals' | 'gyro-pedals' | 'hybrid';
@@ -53,6 +55,16 @@ export interface StateMessage {
   buttons: Record<ActionId, boolean>;
 }
 
+/**
+ * Output tuning the tablet pushes to the ESP32. Sent right after hello_ack and
+ * again whenever a setting changes. Changing it never releases keys by itself.
+ */
+export interface OutputConfigMessage {
+  type: 'output_config';
+  version: number;
+  steerPulse: SteerPulseConfig;
+}
+
 export interface PingMessage {
   type: 'ping';
   version: number;
@@ -66,7 +78,7 @@ export interface ByeMessage {
   reason: string;
 }
 
-export type ClientMessage = HelloMessage | StateMessage | PingMessage | ByeMessage;
+export type ClientMessage = HelloMessage | StateMessage | OutputConfigMessage | PingMessage | ByeMessage;
 
 // ─── ESP32 → tablet ─────────────────────────────────────────────────────────
 
@@ -101,6 +113,10 @@ export interface StatusMessage {
   watchdogTripped: boolean;
   /** Ground truth: which keys the ESP32 is holding right now, e.g. { KeyA: true }. */
   keys: Record<string, boolean>;
+  /** Optional: duty the steer key is pulsing at, 0 … 1 ('hold' reports 0 or 1). */
+  steerDuty?: number;
+  /** Optional: steer key presses in the last second — shows the pulses actually happening. */
+  steerPressesPerSec?: number;
 }
 
 export type ErrorCode = 'version' | 'handshake' | 'malformed' | 'stale' | 'rate';

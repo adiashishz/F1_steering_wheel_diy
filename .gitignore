@@ -7,3 +7,4 @@ dist-ssr/
 .vite/
 /tablet/dev-dist/
 /*.jsonl
+firmware/**/secrets.h

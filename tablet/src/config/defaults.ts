@@ -25,12 +25,16 @@ export function defaultFor<P extends FieldPath>(path: P): FieldValue<P> {
  * Make `v` a legal value for `path`, or return undefined if it can't be.
  *   number → must be finite, clamped to min/max
  *   bool   → must be a boolean
+ *   enum   → must be one of the options
  */
 export function sanitizeField<P extends FieldPath>(path: P, v: unknown): FieldValue<P> | undefined {
   const spec = specFor(path);
   if (spec.kind === 'number') {
     if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
     return Math.min(Math.max(v, spec.min), spec.max) as FieldValue<P>;
+  }
+  if (spec.kind === 'enum') {
+    return spec.options.some((o) => o.value === v) ? (v as FieldValue<P>) : undefined;
   }
   return typeof v === 'boolean' ? (v as FieldValue<P>) : undefined;
 }

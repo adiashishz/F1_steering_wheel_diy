@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm -F tablet dev",
+    "dev:lan": "pnpm -F tablet dev:lan",
     "dev:server": "pnpm -F mock-esp32 dev",
     "dev:all": "concurrently -n tablet,esp32 -c cyan,magenta \"pnpm -F tablet dev\" \"pnpm -F mock-esp32 dev\"",
+    "dev:all:lan": "concurrently -n tablet,esp32 -c cyan,magenta \"pnpm -F tablet dev:lan\" \"pnpm -F mock-esp32 dev\"",
     "build": "pnpm -F tablet build",
     "preview": "pnpm -F tablet preview",
     "typecheck": "pnpm -r typecheck"

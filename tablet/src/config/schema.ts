@@ -1,18 +1,22 @@
 /**
  * The shape of all user settings. Grows as phases land:
- *   now       steering + pitch axis tuning
- *   Phase 5+  pedals, buttons, network, mode … (extended in 8.1)
+ *   now       steering + pitch axis tuning, pedal source, steer-key output (lock test)
+ *   Phase 8+  buttons, network, mode … (extended in 8.1)
  *
  * Every leaf value MUST have a row in fieldSpecs.ts — the compiler enforces it.
  */
 
-import type { AxisConfig } from '@wheel/protocol';
+import type { AxisConfig, SteerPulseConfig } from '@wheel/protocol';
 
 export interface AppConfig {
   /** Roll → steering. */
   steering: AxisConfig;
   /** Pitch → throttle (+) / brake (−) in gyro-pedal modes. */
   pitch: AxisConfig;
+  /** Touch pads always drive the pedals. `gyro` adds pitch on top. */
+  pedals: { gyro: boolean };
+  /** How the ESP32 turns steering into steer-key presses. Pushed to it as `output_config`. */
+  steerOutput: SteerPulseConfig;
 }
 
 // ─── path helpers ───────────────────────────────────────────────────────────
