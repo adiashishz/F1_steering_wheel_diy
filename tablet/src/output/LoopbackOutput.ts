@@ -73,7 +73,7 @@ export class LoopbackOutput implements OutputDevice {
     this.wasArmed = true;
 
     copyState(state, this.scratch);
-    enforceExclusivity(this.scratch, 'dominant', DEFAULT_EXCLUSIVITY_THRESHOLD);
+    enforceExclusivity(this.scratch, 'allow-both', DEFAULT_EXCLUSIVITY_THRESHOLD); // same as the loop: both pedals pass
     this.record(this.machine.step(this.scratch, now));
   }
 

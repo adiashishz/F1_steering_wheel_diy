@@ -11,6 +11,8 @@
  *   tablet ◄─hello_ack─ ESP32        "accepted, here are my limits"
  *   tablet ──state──►  ESP32         100×/sec: what the driver is doing
  *   tablet ──output_config──► ESP32  on connect + on change: how to turn steering into keys
+ *   tablet ──rtc_offer──► / ◄──rtc_answer──  optional: open a WebRTC data channel
+ *                                    (unordered, no retransmits) and move state + ping onto it
  *   tablet ──ping───►  ESP32   ──┐
  *   tablet ◄─pong──── ESP32   ◄─┘   round trip = latency
  *   tablet ◄─status── ESP32          ~5×/sec: what the ESP32 is actually pressing
@@ -65,6 +67,32 @@ export interface OutputConfigMessage {
   steerPulse: SteerPulseConfig;
 }
 
+/**
+ * WebRTC set-up, carried over the WebSocket. Full SDP, candidates included (no
+ * trickle) — on a LAN only host candidates exist and gathering is instant.
+ * Once the data channel is open, `state` and `ping` go over it; a late or lost
+ * packet is just skipped (seq already rejects old ones) instead of stalling
+ * everything behind it the way TCP does. Everything else stays on the socket.
+ */
+export interface RtcOfferMessage {
+  type: 'rtc_offer';
+  version: number;
+  sdp: string;
+}
+
+export interface RtcAnswerMessage {
+  type: 'rtc_answer';
+  version: number;
+  sdp: string;
+}
+
+/** Diagnostics only: a line for the bridge's log (e.g. every pedal touch). Never affects output. */
+export interface LogMessage {
+  type: 'log';
+  version: number;
+  text: string;
+}
+
 export interface PingMessage {
   type: 'ping';
   version: number;
@@ -78,7 +106,14 @@ export interface ByeMessage {
   reason: string;
 }
 
-export type ClientMessage = HelloMessage | StateMessage | OutputConfigMessage | PingMessage | ByeMessage;
+export type ClientMessage =
+  | HelloMessage
+  | StateMessage
+  | OutputConfigMessage
+  | RtcOfferMessage
+  | LogMessage
+  | PingMessage
+  | ByeMessage;
 
 // ─── ESP32 → tablet ─────────────────────────────────────────────────────────
 
@@ -117,6 +152,8 @@ export interface StatusMessage {
   steerDuty?: number;
   /** Optional: steer key presses in the last second — shows the pulses actually happening. */
   steerPressesPerSec?: number;
+  /** Optional: round trip of the NEXT hop (e.g. Mac ↔ PS5 for the ps5-link bridge), ms. */
+  linkRttMs?: number;
 }
 
 export type ErrorCode = 'version' | 'handshake' | 'malformed' | 'stale' | 'rate';
@@ -131,4 +168,4 @@ export interface ErrorMessage {
   fatal: boolean;
 }
 
-export type ServerMessage = HelloAckMessage | PongMessage | StatusMessage | ErrorMessage;
+export type ServerMessage = HelloAckMessage | RtcAnswerMessage | PongMessage | StatusMessage | ErrorMessage;

@@ -8,3 +8,7 @@ dist-ssr/
 /tablet/dev-dist/
 /*.jsonl
 firmware/**/secrets.h
+
+# ps5-link: build output, and the PS5 pairing (private: it can start Remote Play on your console)
+ps5-link/build/
+*.creds

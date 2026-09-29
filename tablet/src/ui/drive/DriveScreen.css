@@ -23,8 +23,10 @@
   gap: var(--gap);
   min-height: 0;
 }
+/* Not the whole column: a shorter pad means less thumb travel from light to 100%. */
 .drive__side .pad {
-  flex: 1 1 auto;
+  flex: 0 0 50%;
+  margin-top: auto; /* sits at the bottom; the gap is under the paddle */
 }
 
 .drive__actions {
@@ -91,17 +93,21 @@
   transform: rotate(180deg);
 }
 .pad__key {
-  font-size: 12px;
-  color: var(--text-dim);
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 1.2em;
 }
+.pad--throttle .pad__key { color: var(--go); }
+.pad--brake .pad__key { color: var(--accent); }
 .pad--throttle .pad__label { color: var(--go); }
 .pad--brake .pad__label { color: var(--accent); }
+/* Filled from the bottom to the level being sent (--level 0…1, set every frame). */
 .pad--throttle[data-active='1'] {
-  background: var(--go-soft);
+  background: linear-gradient(to top, var(--go-soft) 0 calc(var(--level, 1) * 100%), var(--panel) 0);
   border-color: var(--go);
 }
 .pad--brake[data-active='1'] {
-  background: var(--accent-soft);
+  background: linear-gradient(to top, var(--accent-soft) 0 calc(var(--level, 1) * 100%), var(--panel) 0);
   border-color: var(--accent);
 }
 
@@ -367,12 +373,50 @@
   font-size: 20px;
   color: var(--text-muted);
 }
+/* L2 + L1 side by side (R1 + R2 on the right), like the top of a DualSense. */
+.menu__shoulders {
+  flex: 0 0 64px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+/* L3 / R3: a stick-click pill under the D-pad / face buttons. */
+.stick {
+  flex: 0 0 52px;
+  align-self: center;
+  width: min(100%, 200px);
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #222b3a, #151b25);
+  box-shadow: 0 0 0 1px #34405c, 0 8px 14px #000a, inset 0 1px 0 #ffffff12;
+}
+.stick .action__label {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+/* Create · PS · Options in one row. */
+.menu__system {
+  flex: 0 0 64px;
+  display: flex;
+  justify-content: center;
+  gap: var(--gap);
+}
+.menu__system .options {
+  flex: 1 1 0;
+  width: auto;
+  max-width: 200px;
+}
+.menu__system .options--ps {
+  flex: 0 0 64px;
+}
 .shoulder[data-active='1'],
+.stick[data-active='1'],
 .options[data-active='1'] {
   box-shadow: 0 0 0 2px var(--info), 0 0 16px #38bdf866, inset 0 2px 6px #000a;
   transform: translateY(1px);
 }
 .shoulder[data-active='1'] .action__label,
+.stick[data-active='1'] .action__label,
 .options[data-active='1'] .action__label {
   color: var(--info);
 }

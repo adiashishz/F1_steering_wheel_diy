@@ -55,6 +55,17 @@ tablet ──Wi-Fi──► Mac bridge ──USB serial "P …"──► ESP32 (
 Mapping lives in `mock-esp32/src/padBridge.ts` (`--steer=left|right`, `--map=drs:r1,…`), so changes never need a reflash.
 The bridge logs every button change and every hole in the stream (tablet-side vs network-side).
 
+### Tablet over USB (no Wi-Fi between tablet and Mac)
+
+Android tablet + USB cable: `adb reverse` tunnels the page's port over the cable, so the
+tablet reaches the Mac at `localhost`. localhost is a secure context (gyro works), and the
+page stays on the WebSocket (TCP) — the tunnel carries no UDP, and over a cable nothing is lost.
+
+1. Tablet: Settings → About → tap **Build number** 7× → Developer options → **USB debugging** on.
+2. Plug it in, accept "Allow USB debugging?" on the tablet.
+3. `adb reverse tcp:5173 tcp:5173` (again after every re-plug), then open `https://localhost:5173`.
+   The status pill shows `usb`.
+
 ## Live lock test (tablet → ESP32 → PS5, keyboard route)
 
 Does pulsing the steer key give part-way lock in F1 25 if the period is short

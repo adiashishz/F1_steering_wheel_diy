@@ -11,6 +11,9 @@
     "dev:all:lan": "concurrently -n tablet,esp32 -c cyan,magenta \"pnpm -F tablet dev:lan\" \"pnpm -F mock-esp32 dev\"",
     "bridge": "pnpm -F mock-esp32 start -- --serial",
     "dev:bridge": "concurrently -n tablet,bridge -c cyan,magenta \"pnpm -F tablet dev:lan\" \"pnpm -F mock-esp32 start -- --serial\"",
+    "bridge:ps5": "pnpm -F mock-esp32 start -- --ps5",
+    "dev:ps5": "concurrently -n tablet,ps5 -c cyan,magenta \"pnpm -F tablet dev:lan\" \"pnpm -F mock-esp32 start -- --ps5\"",
+    "prod:ps5": "pnpm -F tablet build && concurrently -n tablet,ps5 -c cyan,magenta \"pnpm -F tablet preview:lan\" \"pnpm -F mock-esp32 start -- --ps5\"",
     "build": "pnpm -F tablet build",
     "preview": "pnpm -F tablet preview",
     "typecheck": "pnpm -r typecheck"
