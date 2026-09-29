@@ -22,7 +22,7 @@ Full spec: [plan.md](plan.md).
 |---|---|
 | `protocol/` | Shared types + math + key logic. Runs in browser, node, and (ported) firmware. |
 | `tablet/` | The React PWA you hold. |
-| `mock-esp32/` | Node server that pretends to be the ESP32. |
+| `mock-esp32/` | Node server: the mock ESP32, and with `--serial` the real Mac → DualSense bridge. |
 | `firmware/esp32/` | ESP32-S3 sketches: gate tests (serial, keyboard, PS5 drive, gamepad, pulse) + `wheel_link` (Wi-Fi link used by the lock test). |
 | `docs/` | Architecture, calibration, troubleshooting. |
 
@@ -36,7 +36,26 @@ pnpm dev:all:lan  # same, but https on the LAN so a tablet can join
 pnpm typecheck
 ```
 
-## Live lock test (tablet → ESP32 → PS5)
+## DualSense bridge (current route — real analog steering)
+
+Tablet → Mac → ESP32 pretending to be a **DualSense** on the Mac's USB → **PS Remote Play** → PS5.
+Proven 2026-09-29: macOS and Remote Play accept it, and F1 25 steers part-way from part-way stick.
+No Sony authentication is involved: Remote Play talks to the PS5 over the network.
+
+```
+tablet ──Wi-Fi──► Mac bridge ──USB serial "P …"──► ESP32 (054C:0CE6 DualSense) ──USB──► Remote Play ──► PS5
+```
+
+1. Flash `firmware/esp32/pad_bridge` (no Wi-Fi / secrets needed), plug the ESP32 into the Mac.
+2. Open PS Remote Play on the Mac and connect to the PS5 (360p / Standard keeps Wi-Fi quiet).
+3. `pnpm dev:bridge` → tablet opens `https://<mac-ip>:5173`.
+4. **Disarmed** = menu screen (D-pad, △○✕□, L1/R1, Options — works without arming).
+   **ARM** = F1 screen (gyro steering, R2/L2 pedals, gears ✕/□, DRS △, Boost ○).
+
+Mapping lives in `mock-esp32/src/padBridge.ts` (`--steer=left|right`, `--map=drs:r1,…`), so changes never need a reflash.
+The bridge logs every button change and every hole in the stream (tablet-side vs network-side).
+
+## Live lock test (tablet → ESP32 → PS5, keyboard route)
 
 Does pulsing the steer key give part-way lock in F1 25 if the period is short
 enough? The scripted P.1 test only tried 80/160 ms; this one tunes it live.

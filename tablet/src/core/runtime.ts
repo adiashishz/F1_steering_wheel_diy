@@ -1,7 +1,8 @@
 /**
  * COMPOSITION ROOT — the one place that decides which pieces are plugged in.
  *
- *   sensor  : SensorSwitch → SimulatedSensorSource (start) | DeviceOrientationSource (tap "Use gyro")
+ *   sensor  : SensorSwitch → tablet gyro, started automatically (iOS: on the first touch);
+ *             the simulated sliders are only the fallback when there's no gyro
  *   config  : in-memory ConfigStore   (saved to device: Phase 8)
  *   touch   : touch pads + test chips (input/touchState)
  *   output  : WebSocketOutput → ESP32 or mock server, via the `/esp` proxy
@@ -22,6 +23,7 @@ import { WebSocketOutput } from '../output/WebSocketOutput';
 import { DeviceOrientationSource } from '../sensors/DeviceOrientationSource';
 import { SensorSwitch } from '../sensors/SensorSwitch';
 import { SimulatedSensorSource } from '../sensors/SimulatedSensorSource';
+import type { SensorStatus } from '../sensors/types';
 
 export interface Runtime {
   /** Whichever sensor is active (simulated or tablet gyro). */
@@ -38,6 +40,10 @@ export interface Runtime {
   loopback: LoopbackOutput | null;
   live: HotStore<LiveState>;
   control: ControlLoop;
+  /** Result of the last attempt to start the tablet gyro ('idle' = not tried yet). */
+  readonly gyroStatus: SensorStatus;
+  /** Try the tablet gyro again (call from a tap on iOS). */
+  startGyro(): Promise<SensorStatus>;
   /** Start sensor + loop + connection. Safe to call more than once. */
   boot(): void;
   shutdown(): void;
@@ -54,6 +60,14 @@ function createRuntime(): Runtime {
 
   let booted = false;
   let removeGuards = () => {};
+  let gyroStatus: SensorStatus = 'idle';
+
+  const startGyro = async (): Promise<SensorStatus> => {
+    if (!DeviceOrientationSource.isAvailable()) return (gyroStatus = 'unsupported');
+    gyroStatus = 'starting';
+    gyroStatus = await sensor.use('deviceorientation'); // failure → stays on the sliders
+    return gyroStatus;
+  };
 
   return {
     sensor,
@@ -65,11 +79,27 @@ function createRuntime(): Runtime {
     loopback: null,
     live,
     control,
+    get gyroStatus() {
+      return gyroStatus;
+    },
+    startGyro,
     boot() {
       if (booted) return;
       booted = true;
       void sensor.start();
       control.start();
+      // Gyro ALWAYS on where there is one. Try right away; browsers that only allow
+      // the motion-permission prompt inside a touch (iOS, newer Chrome) refuse that,
+      // so then it starts on the first touch anywhere.
+      void startGyro().then((status) => {
+        if (status !== 'permission-denied') return;
+        gyroStatus = 'idle';
+        const firstTouch = () => {
+          window.removeEventListener('pointerdown', firstTouch, true);
+          void startGyro();
+        };
+        window.addEventListener('pointerdown', firstTouch, true);
+      });
       if (document.visibilityState !== 'hidden') esp.connect();
       const removeRelease = installReleaseGuards(() => control.setArmed(false));
       // The ESP32 serves ONE driver: a background tab must not hold the link,

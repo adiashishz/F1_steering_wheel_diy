@@ -232,6 +232,10 @@ One piece at a time, stop after each. Each piece is 1–4 files and has its own 
 
 - [ ] L.1 **Live lock test** (2026-09-26 build): tablet gyro / hold-chips → `wheel_link` ESP32 → pulsed steer key, tuned live (mode hold / pwm / sigma, period 10–200 ms, shortest press 4–50 ms). P.1 only tried 80/160 ms periods; the ESP32's keyboard polls at 1 ms, so shorter pulses reach the PS5. PASS → some setting gives steady part-way lock without visible shake · FAIL → keyboard steering is on/off, go analog (Access Controller). Runbook: README *Live lock test*.
 
+- [x] D.1 ✅ **PASSED 2026-09-29** — ESP32 as a USB **DualSense** (054C:0CE6) on the Mac: macOS attaches its game-controller driver, **PS Remote Play accepts it**, and F1 25 steers **part-way** from a part-way stick. Needs CDCOnBoot off (the core would otherwise start USB with Espressif's IDs before `setup()`). → real analog steering route.
+- [x] D.2 Mac bridge (`mock-esp32 --serial`, `padBridge.ts`) + `pad_bridge` firmware: tablet → Mac → serial → DualSense. Menu screen when disarmed, F1 screen when armed; one-driver rule; stream-hole diagnostics.
+- [ ] D.3 Headless chiaki-ng input client (no ESP32, no video decode, watch the TV) — next.
+
 *Part 2: the real firmware — after Phase 7 AND only if F.3 passed.* Mirrors the mock server, which by then is a tested spec.
 - [ ] F.4 Wi-Fi + WebSocket server, `hello` / `hello_ack` handshake — written early for L.1 (`firmware/esp32/wheel_link/`), compiles, not yet run on hardware
 - [ ] F.5 Port `codec.ts` validation + session states (PENDING → AWAITING_FRESH → LIVE)

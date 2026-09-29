@@ -27,7 +27,8 @@ import {
 } from '@wheel/protocol';
 import { createOutputStats, type OutputDevice } from './OutputDevice';
 
-export type LinkState = 'idle' | 'connecting' | 'handshake' | 'live' | 'closed' | 'rejected';
+/** 'busy' = another device is driving; we retry quietly and take over once it stops. */
+export type LinkState = 'idle' | 'connecting' | 'handshake' | 'live' | 'closed' | 'rejected' | 'busy';
 
 /** Everything the UI shows about the link. Mutated in place; read it a few times a second. */
 export interface LinkInfo {
@@ -54,6 +55,7 @@ const SILENCE_MS = 1500;
 const MAX_BUFFERED = 8 * 1024;
 const BACKOFF_MIN_MS = 500;
 const BACKOFF_MAX_MS = 4000;
+const BUSY_RETRY_MS = 3000;
 
 export class WebSocketOutput implements OutputDevice {
   readonly id = 'esp32';
@@ -224,6 +226,13 @@ export class WebSocketOutput implements OutputDevice {
       const msg = r.msg;
       switch (msg.type) {
         case 'hello_ack':
+          if (!msg.accepted && msg.reason?.startsWith('busy')) {
+            this.close('busy');
+            this.link.state = 'busy';
+            this.link.lastError = 'another device is driving — waiting';
+            this.retry = setTimeout(() => this.open(), BUSY_RETRY_MS);
+            return;
+          }
           if (!msg.accepted) {
             this.link.lastError = msg.reason ?? 'rejected';
             this.link.state = 'rejected';

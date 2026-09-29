@@ -12,6 +12,12 @@
  *   1 s    one console status line while connected
  *
  * Usage: pnpm -F mock-esp32 dev [-- --port=8080] [--keys]     (or env PORT)
+ *
+ * BRIDGE MODE — the real thing, not a mock:
+ *   --serial[=/dev/cu.usbmodem…]   drive the ESP32 `pad_bridge` firmware (a fake DualSense on this
+ *                                  Mac's USB) → PS Remote Play → PS5. Default port: auto-detect.
+ *   --steer=left|right             which stick steers (default left)
+ *   --map=gearUp:cross,drs:r1      action → DualSense button overrides
  */
 
 import { createServer } from 'node:http';
@@ -19,6 +25,7 @@ import { performance } from 'node:perf_hooks';
 import { PROTOCOL_VERSION } from '@wheel/protocol';
 import { WebSocketServer } from 'ws';
 import { endStatus, log, statusLine } from './log';
+import { PadBridge, parseMapping } from './padBridge';
 import { Device, SERVER_INFO, WATCHDOG_MS } from './session';
 
 const args = process.argv.slice(2);
@@ -26,7 +33,17 @@ const portArg = args.find((a) => a.startsWith('--port='))?.slice('--port='.lengt
 const port = Number(portArg ?? process.env.PORT ?? 8080);
 const printKeys = args.includes('--keys');
 
+const serialArg = args.find((a) => a === '--serial' || a.startsWith('--serial='));
+const valueOf = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+
 const device = new Device(printKeys);
+const pad = serialArg
+  ? new PadBridge(serialArg.includes('=') ? serialArg.slice('--serial='.length) : 'auto', parseMapping(valueOf('map'), valueOf('steer')))
+  : null;
+if (pad) {
+  SERVER_INFO.name = 'mac-pad-bridge';
+  device.padStatus = () => ({ keys: pad.held(), steer: device.output().steering });
+}
 
 // ─── HTTP (/status) + WebSocket on the same port ────────────────────────────
 
@@ -72,16 +89,23 @@ http.listen(port, () => {
 
 // ─── timers ─────────────────────────────────────────────────────────────────
 
-const tickTimer = setInterval(() => device.tick(performance.now()), 1);
+const tickTimer = setInterval(() => {
+  const now = performance.now();
+  device.tick(now);
+  pad?.update(device.output(), now);
+}, 1);
 const statusTimer = setInterval(() => device.sendStatus(performance.now()), 200);
 const consoleTimer = setInterval(() => {
-  if (device.connected) statusLine(device.summary(performance.now()));
+  pad?.tickSecond();
+  const padInfo = pad ? ` · pad ${pad.connected ? `${pad.linesPerSec} lines/s L2 ${pad.pad.l2} R2 ${pad.pad.r2} X ${pad.pad.lx}` : 'NOT CONNECTED'}` : '';
+  if (device.connected) statusLine(device.summary(performance.now()) + padInfo);
 }, 1000);
 
 // ─── shutdown: release everything first ─────────────────────────────────────
 
 function shutdown(): void {
   device.machine.releaseAll(performance.now());
+  pad?.centreAndClose();
   clearInterval(tickTimer);
   clearInterval(statusTimer);
   clearInterval(consoleTimer);

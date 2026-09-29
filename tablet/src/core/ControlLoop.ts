@@ -36,7 +36,7 @@ import type { HotStore } from './hotStore';
 import { buildFrame, createFrame, DEFAULT_STALE_SENSOR_MS, type RawInputFrame } from './pipeline';
 import { IntervalStats, RateMeter } from './telemetry';
 import type { ConfigStore } from '../config/configStore';
-import { touchIsNeutral, type TouchState } from '../input/touchState';
+import { DRIVE_ACTIONS, MENU_ACTIONS, releaseAllTouch, touchIsNeutral, type TouchState } from '../input/touchState';
 import type { OutputDevice } from '../output/OutputDevice';
 import type { SensorSource, SensorStatus } from '../sensors/types';
 
@@ -77,6 +77,8 @@ export interface LiveState {
   steeringOut: number;
   /** Disarmed by a link drop; re-arms once the link is back and nothing is pressed. */
   rearmPending: boolean;
+  /** Disarmed and linked: only the menu buttons (D-pad, face buttons, L1/R1, Options) are sent. */
+  menuMode: boolean;
 
   /** What was actually handed to the output this tick (after exclusivity). */
   throttle: number;
@@ -111,6 +113,7 @@ export function createLiveState(): LiveState {
     steerOverride: false,
     steeringOut: 0,
     rearmPending: false,
+    menuMode: false,
     throttle: 0,
     brake: 0,
     armed: false,
@@ -211,6 +214,9 @@ export class ControlLoop {
    */
   setArmed(on: boolean): boolean {
     if (on && !this.deps.output.ready) return false;
+    // The screen swaps (F1 ↔ menu) and unmounted buttons never see pointerup:
+    // let go of every touch so nothing held on one screen carries into the other.
+    if (on !== this.armed) releaseAllTouch();
     this.armIntent = on;
     if (this.armed && !on) this.deps.output.releaseAll(performance.now(), 'disarmed');
     this.armed = on;
@@ -288,7 +294,12 @@ export class ControlLoop {
     const output = this.deps.output;
     const touch = this.deps.touch;
     const s = this.state;
-    for (const id in touch.buttons) s.buttons[id] = touch.buttons[id]!;
+    // Armed → drive buttons only. Disarmed (and not waiting to re-arm) → MENU mode:
+    // menu buttons only, and no steering or pedals at all.
+    const menu = !this.armed && !this.rearmPending && output.ready;
+    v.menuMode = menu;
+    for (const id of DRIVE_ACTIONS) s.buttons[id] = this.armed && touch.buttons[id] === true;
+    for (const id of MENU_ACTIONS) s.buttons[id] = menu && touch.buttons[id] === true;
     // A held test chip wins over the gyro: a fixed, repeatable steering value.
     v.steerOverride = touch.steerOverride !== null;
     s.steering = touch.steerOverride ?? v.steering;
@@ -298,6 +309,11 @@ export class ControlLoop {
     s.throttle = Math.max(touch.throttle, tiltThrottle);
     s.brake = Math.max(touch.brake, tiltBrake);
     enforceExclusivity(s, 'dominant', DEFAULT_EXCLUSIVITY_THRESHOLD);
+    if (menu) {
+      s.steering = 0;
+      s.throttle = 0;
+      s.brake = 0;
+    }
 
     // If the output stops being ready (e.g. disconnect later), drop to disarmed.
     if (this.armed && !output.ready) {
@@ -306,7 +322,9 @@ export class ControlLoop {
     } else if (this.rearmPending && output.ready && touchIsNeutral()) {
       this.armed = true;
     }
-    output.send(s, now, this.armed);
+    // Menu mode goes out "armed" so the menu buttons reach the game; the state
+    // itself is neutral apart from them.
+    output.send(s, now, this.armed || menu);
 
     v.steeringOut = s.steering;
     v.throttle = s.throttle;
