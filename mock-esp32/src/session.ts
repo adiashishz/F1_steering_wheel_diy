@@ -26,9 +26,11 @@ import {
   KeyStateMachine,
   NEUTRAL_STATE,
   PROTOCOL_VERSION,
+  createNeutralState,
   decodeClient,
   encodeServer,
   enforceExclusivity,
+  type ControllerState,
   type ErrorCode,
   type KeyEvent,
   type ServerMessage,
@@ -42,6 +44,8 @@ import { log } from './log';
 export const SERVER_INFO = { name: 'mock-esp32', version: '0.1.0' };
 export const WATCHDOG_MS = 300; // matches wheel_link: 150 tripped on real Wi-Fi jitter
 export const MAX_SEND_RATE_HZ = 100;
+/** A session that sent valid state this recently is "driving" — other devices are refused. */
+const BUSY_MS = 1000;
 /** Non-fatal errors of one code are sent at most this often per socket, so a bad stream can't flood. */
 const ERROR_REPEAT_MS = 1000;
 
@@ -82,6 +86,13 @@ export class Device {
   /** socket → code → last time that error was sent. */
   private readonly lastError = new WeakMap<WebSocket, Map<ErrorCode, number>>();
   private readonly keysOut: Record<string, boolean> = {};
+  /** Latest accepted input (after exclusivity). Only used while LIVE and armed. */
+  private readonly lastInput: ControllerState = createNeutralState();
+  /**
+   * Set when a DualSense bridge is the real output: status then reports its held
+   * buttons instead of the (virtual) keyboard's keys.
+   */
+  padStatus: (() => { keys: Record<string, boolean>; steer: number }) | null = null;
 
   constructor(private readonly printKeys: boolean) {}
 
@@ -118,6 +129,23 @@ export class Device {
         return;
 
       case 'hello': {
+        // ONE driver: while someone is actively driving, a second device is refused
+        // (it retries quietly) instead of taking over — two open pages used to steal
+        // the session from each other dozens of times a minute.
+        if (this.socket && this.socket !== ws && this.state === 'LIVE' && now - this.lastValidAt < BUSY_MS) {
+          this.send(ws, {
+            type: 'hello_ack',
+            version: PROTOCOL_VERSION,
+            accepted: false,
+            reason: 'busy: another device is driving',
+            server: SERVER_INFO,
+            watchdogMs: WATCHDOG_MS,
+            maxSendRateHz: MAX_SEND_RATE_HZ,
+            serverTime: now,
+          });
+          log('busy', `refused a second device (${msg.client.app}) — ${this.client} is driving`);
+          return;
+        }
         if (this.socket && this.socket !== ws) {
           log('session', `replaced by a new hello — closing the old socket`);
           const old = this.socket;
@@ -137,6 +165,7 @@ export class Device {
         this.packets.clear();
         this.steerPresses.clear();
         this.steerPulse = DEFAULT_STEER_PULSE; // until output_config arrives
+        this.lastArrival = 0;
         this.machine.setSteerPulse(this.steerPulse);
         this.send(ws, {
           type: 'hello_ack',
@@ -184,6 +213,7 @@ export class Device {
       this.sendError(ws, 'handshake', 'state before hello', false, now);
       return;
     }
+    if (s.sessionId === this.sessionId) this.noteGap(s, now);
     if (s.sessionId !== this.sessionId) {
       this.dropped++;
       this.sendError(ws, 'stale', `state for session ${s.sessionId.slice(0, 8)}, current is ${this.sessionId.slice(0, 8)}`, false, now);
@@ -219,8 +249,28 @@ export class Device {
       // The tablet already did this; do it again so a buggy tablet can't hold both pedals.
       enforceExclusivity(s, 'dominant', DEFAULT_EXCLUSIVITY_THRESHOLD);
       this.machine.update(s);
+      copyInput(s, this.lastInput);
     }
     this.emit(this.machine.tick(now));
+  }
+
+  private lastArrival = 0;
+  private lastSentTs = 0;
+
+  /**
+   * Why was there a hole in the stream? Each packet carries the tablet's send time:
+   *   tablet's own gap ≈ arrival gap → the TABLET stopped sending (browser stalled / throttled)
+   *   tablet gap small, arrival gap big → the NETWORK held the packets (Wi-Fi stall / TCP retransmit)
+   */
+  private noteGap(s: StateMessage, now: number): void {
+    const arrival = now - this.lastArrival;
+    const sent = s.timestamp - this.lastSentTs;
+    if (this.lastArrival > 0 && arrival > 120) {
+      const who = sent >= arrival * 0.6 ? 'TABLET stopped sending' : 'NETWORK held packets';
+      log('gap', `${Math.round(arrival)} ms without packets · tablet send gap ${Math.round(sent)} ms → ${who}`);
+    }
+    this.lastArrival = now;
+    this.lastSentTs = s.timestamp;
   }
 
   /** Socket closed. Only matters if it was the active one. */
@@ -243,6 +293,14 @@ export class Device {
     this.emit(this.machine.tick(now));
   }
 
+  /**
+   * What any real output should be doing RIGHT NOW: the latest input while LIVE
+   * and armed, otherwise neutral. Disarm, watchdog, disconnect all land here for free.
+   */
+  output(): Readonly<ControllerState> {
+    return this.state === 'LIVE' && this.armed ? this.lastInput : NEUTRAL_STATE;
+  }
+
   // ─── outgoing ─────────────────────────────────────────────────────────────
 
   status(now: number): StatusMessage {
@@ -254,9 +312,10 @@ export class Device {
       droppedPackets: this.dropped,
       outputArmed: this.state === 'LIVE' && this.armed,
       watchdogTripped: this.state === 'TRIPPED',
-      keys: this.machine.snapshot(this.keysOut),
-      steerDuty: this.machine.steerDuty,
-      steerPressesPerSec: this.steerPresses.count(now),
+      keys: this.padStatus ? this.padStatus().keys : this.machine.snapshot(this.keysOut),
+      // With a pad, "duty" is just how far the stick is out; nothing pulses.
+      steerDuty: this.padStatus ? Math.min(Math.abs(this.padStatus().steer), 1) : this.machine.steerDuty,
+      steerPressesPerSec: this.padStatus ? 0 : this.steerPresses.count(now),
     };
   }
 
@@ -329,4 +388,13 @@ function fmtPulse(p: SteerPulseConfig): string {
   if (p.mode === 'hold') return 'hold';
   const period = p.mode === 'pwm' ? ` period ${p.periodMs} ms ·` : '';
   return `${p.mode} ·${period} min pulse ${p.minPulseMs} ms · full at ${p.fullAt} · max duty ${p.maxDuty}`;
+}
+
+/** Copy without allocating a new object each packet. */
+function copyInput(src: Readonly<ControllerState>, dst: ControllerState): void {
+  dst.steering = src.steering;
+  dst.throttle = src.throttle;
+  dst.brake = src.brake;
+  for (const id in dst.buttons) if (!(id in src.buttons)) dst.buttons[id] = false;
+  for (const id in src.buttons) dst.buttons[id] = src.buttons[id] === true;
 }

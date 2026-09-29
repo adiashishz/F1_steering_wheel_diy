@@ -113,6 +113,14 @@ export const DEFAULT_KEYMAP: KeyMapConfig = {
     ers: 'KeyM', //   F1 25 calls it "Overtake / Boost"
     mfd: 'Numpad0',
     radio: 'KeyT',
+    // Menu navigation (keyboard route): arrows, Enter = accept, Esc = back / pause.
+    dpadUp: 'ArrowUp',
+    dpadDown: 'ArrowDown',
+    dpadLeft: 'ArrowLeft',
+    dpadRight: 'ArrowRight',
+    menuSelect: 'Enter',
+    menuBack: 'Escape',
+    pause: 'Escape',
   },
   steerOn: 0.15,
   steerOff: 0.1,

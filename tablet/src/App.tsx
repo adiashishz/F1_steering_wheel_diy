@@ -9,6 +9,8 @@ import { TelemetryPanel } from './ui/debug/TelemetryPanel';
 import { AxisSettings } from './ui/settings/AxisSettings';
 import { AxisScope } from './ui/debug/AxisScope';
 import { DriveScreen } from './ui/drive/DriveScreen';
+import { TouchProbe } from './ui/debug/TouchProbe';
+import { FullscreenButton } from './ui/FullscreenButton';
 import './App.css';
 
 type Tab = 'drive' | 'tune';
@@ -55,6 +57,7 @@ export function App() {
           </section>
         </div>
         <aside className="panel shell__debug">
+          <TouchProbe />
           <TelemetryPanel />
         </aside>
       </main>
@@ -75,6 +78,7 @@ export function App() {
             </button>
           ))}
         </div>
+        <FullscreenButton />
         <span className="placeholder mono">{runtime.esp.link.url}</span>
       </footer>
 

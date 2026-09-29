@@ -213,7 +213,180 @@
 .strip__arm:active {
   filter: brightness(1.3);
 }
+.strip__gyro {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.strip__gyro[data-on='1'] {
+  color: var(--go);
+}
 .strip__note {
   font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ─── menu screen (disarmed): a controller ────────────────────────────────── */
+.menu {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+}
+.menu__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+}
+.menu__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.action--nav {
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+}
+.action--nav .action__label {
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+/* ─── D-pad: one cross, finger position picks the arm ────────────────────── */
+.menu__padwrap {
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.dpad {
+  position: relative;
+  width: min(100%, 100cqh, 320px);
+  aspect-ratio: 1;
+  touch-action: none;
+  cursor: pointer;
+  --arm: 34%;
+  --off: calc((100% - var(--arm)) / 2);
+}
+.menu__padwrap {
+  container-type: size;
+}
+.dpad__shape {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 0 1px #34405c) drop-shadow(0 8px 14px #000a);
+  pointer-events: none;
+}
+.dpad__bar {
+  position: absolute;
+  background: #19202c;
+}
+.dpad__bar--v { left: var(--off); width: var(--arm); top: 0; bottom: 0; border-radius: 16px; }
+.dpad__bar--h { top: var(--off); height: var(--arm); left: 0; right: 0; border-radius: 16px; }
+.dpad__arm {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: var(--arm);
+  height: var(--off);
+  color: var(--text-muted);
+  font-size: clamp(16px, 5cqh, 26px);
+  border-radius: 14px;
+  transition: background 50ms linear, color 50ms linear;
+  pointer-events: none;
+}
+.dpad__arm--up { left: var(--off); top: 0; }
+.dpad__arm--down { left: var(--off); bottom: 0; }
+.dpad__arm--left,
+.dpad__arm--right { top: var(--off); width: var(--off); height: var(--arm); }
+.dpad__arm--left { left: 0; }
+.dpad__arm--right { right: 0; }
+.dpad__hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22%;
+  height: 22%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #232c3a, #0f141c);
+  box-shadow: inset 0 2px 6px #000a;
+  pointer-events: none;
+}
+.dpad[data-dir='up'] .dpad__arm--up,
+.dpad[data-dir='down'] .dpad__arm--down,
+.dpad[data-dir='left'] .dpad__arm--left,
+.dpad[data-dir='right'] .dpad__arm--right {
+  background: #38bdf833;
+  color: var(--info);
+  box-shadow: inset 0 0 0 2px var(--info);
+}
+
+/* ─── face buttons, shoulders, Options: same raised look as the D-pad ────── */
+.face {
+  position: relative;
+  width: min(100%, 100cqh, 320px);
+  aspect-ratio: 1;
+  --size: 33%;
+}
+.face__btn {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  border: 0;
+  background: radial-gradient(circle at 40% 30%, #222b3a, #141a24 70%);
+  box-shadow: 0 0 0 1px #34405c, 0 8px 14px #000a, inset 0 1px 0 #ffffff12;
+  --glow: var(--text);
+}
+.face__btn .action__label {
+  font-size: clamp(22px, 9cqh, 40px);
+  letter-spacing: 0;
+  line-height: 1;
+}
+.face__btn .action__sub {
+  font-size: 10px;
+}
+.face--triangle { left: calc(50% - var(--size) / 2); top: 0; --glow: #34d399; }
+.face--square { left: 0; top: calc(50% - var(--size) / 2); --glow: #f472b6; }
+.face--circle { right: 0; top: calc(50% - var(--size) / 2); --glow: #f87171; }
+.face--cross { left: calc(50% - var(--size) / 2); bottom: 0; --glow: var(--info); }
+.face__btn .action__label { color: var(--glow); }
+.face__btn[data-active='1'] {
+  background: radial-gradient(circle at 40% 30%, #2a3446, #182030 70%);
+  box-shadow: 0 0 0 2px var(--glow), 0 0 18px color-mix(in srgb, var(--glow) 45%, transparent), inset 0 2px 6px #000a;
+  transform: translateY(1px);
+}
+
+.shoulder {
+  flex: 0 0 64px;
+  border: 0;
+  border-radius: 22px 22px 10px 10px;
+  background: linear-gradient(180deg, #222b3a, #151b25);
+  box-shadow: 0 0 0 1px #34405c, 0 8px 14px #000a, inset 0 1px 0 #ffffff12;
+}
+.shoulder .action__label {
+  font-size: 20px;
+  color: var(--text-muted);
+}
+.shoulder[data-active='1'],
+.options[data-active='1'] {
+  box-shadow: 0 0 0 2px var(--info), 0 0 16px #38bdf866, inset 0 2px 6px #000a;
+  transform: translateY(1px);
+}
+.shoulder[data-active='1'] .action__label,
+.options[data-active='1'] .action__label {
+  color: var(--info);
+}
+
+.options {
+  flex: 0 0 64px;
+  align-self: center;
+  width: min(100%, 260px);
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #222b3a, #151b25);
+  box-shadow: 0 0 0 1px #34405c, 0 8px 14px #000a, inset 0 1px 0 #ffffff12;
+}
+.options .action__label {
+  font-size: 16px;
   color: var(--text-muted);
 }

@@ -103,3 +103,25 @@
   width: 2px;
   background: var(--border-strong);
 }
+
+/* touch test (TouchProbe) */
+.probe {
+  padding: 12px 14px 0;
+}
+.probe__pad {
+  height: 150px;
+  margin-top: 6px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: var(--panel-2);
+  touch-action: none;
+  overflow: hidden;
+}
+.probe__out {
+  margin: 0;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  pointer-events: none;
+}

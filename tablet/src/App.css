@@ -153,3 +153,42 @@
     z-index: 100;
   }
 }
+
+/* Tune tab's right column holds the touch test + telemetry: let it scroll */
+.shell__debug {
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+/* fullscreen button (footer) + its how-to tip */
+.fs {
+  position: relative;
+  margin-right: auto;
+  margin-left: var(--gap);
+}
+.fs__btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  font-weight: 600;
+  cursor: pointer;
+}
+.fs__btn:active {
+  background: var(--panel-2);
+}
+.fs__tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: min(360px, 80vw);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  z-index: 10;
+}

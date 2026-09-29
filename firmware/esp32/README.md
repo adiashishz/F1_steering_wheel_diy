@@ -20,6 +20,8 @@ tests (Stages 1–3). Once the gate passes, the real firmware must mirror two fi
 
 | `gamepad_test/` | G.1 ❌ | Generic USB gamepad. Long press → D-pad right×3/left×3. Short tap → stick X sweep 25/50/100%, centre, −50% |
 
+| `dualsense_test/` | D.1 ✅ | Pretends to be a USB DualSense (054C:0CE6); serial commands press buttons / move sticks. macOS + PS Remote Play accept it; F1 25 steers part-way |
+| `pad_bridge/` | D.2 ✅ | The DualSense fed by the Mac bridge over USB serial (`P lx ly rx ry l2 r2 hat btn`), 250 Hz reports, centres after 250 ms without a line |
 | `pulse_steer_test/` | P.1 ❌ | Pulses "." at 25/50/75% duty (80 / 160 ms periods) to fake part-way steering |
 
 | `wheel_link/` | F.4–F.7 (experiment) | The real link: Wi-Fi WebSocket server (protocol v1) → `keymap.ts` port → USB keyboard. Not yet tested on hardware |

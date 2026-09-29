@@ -70,7 +70,9 @@ export const FIELD_SPECS = {
   },
   'steering.curve': {
     kind: 'number', label: 'Response curve', unit: '',
-    min: 0.5, max: 3, step: 0.05, default: 1.5,
+    // 1.0 since the DualSense route (2026-09-29): the stick is truly analog and
+    // F1 25 shapes it again; 1.5 was for the on/off keyboard keys.
+    min: 0.5, max: 3, step: 0.05, default: 1,
     help: '1 = linear. Higher = gentler near centre, sharper near lock.',
   },
   'steering.smoothingMs': {

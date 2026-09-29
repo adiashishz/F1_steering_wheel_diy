@@ -21,9 +21,25 @@ export interface TouchState {
 
 /**
  * Every action the tablet can send. Names only — which key each one becomes is
- * the ESP32's business (keymap.ts: gearUp Space, gearDown ShiftLeft, drs F, ers M).
+ * the output's business (DualSense: padBridge.ts DEFAULT_MAPPING · keyboard: keymap.ts).
  */
-export const ACTION_IDS: readonly ActionId[] = ['gearUp', 'gearDown', 'drs', 'ers'];
+/** Work only while ARMED (the F1 screen). */
+export const DRIVE_ACTIONS: readonly ActionId[] = ['gearUp', 'gearDown', 'drs', 'ers'];
+/** Work only while DISARMED (the menu screen) — they can't drive the car. */
+export const MENU_ACTIONS: readonly ActionId[] = [
+  'dpadUp',
+  'dpadDown',
+  'dpadLeft',
+  'dpadRight',
+  'menuSelect', // ✕
+  'menuBack', //   ○
+  'faceTriangle',
+  'faceSquare',
+  'l1',
+  'r1',
+  'pause', //      Options
+];
+export const ACTION_IDS: readonly ActionId[] = [...DRIVE_ACTIONS, ...MENU_ACTIONS];
 
 export const touch: TouchState = {
   throttle: 0,
@@ -47,15 +63,37 @@ export function padUp(pad: Pad, pointerId: number): void {
 
 const buttonPointers: Record<ActionId, Set<number>> = Object.fromEntries(ACTION_IDS.map((id) => [id, new Set<number>()]));
 
+/**
+ * A light tap can go down AND up between two 100 Hz loop ticks and never be
+ * sent. So every press is held for at least this long, even if the finger has
+ * already lifted: ~5 frames at 60 fps, enough for the game to see it.
+ */
+export const MIN_TAP_MS = 80;
+const pressedAt: Record<ActionId, number> = {};
+const pendingRelease: Record<ActionId, ReturnType<typeof setTimeout> | undefined> = {};
+
 export function buttonDown(id: ActionId, pointerId: number): void {
   buttonPointers[id]?.add(pointerId);
+  clearTimeout(pendingRelease[id]);
+  pendingRelease[id] = undefined;
+  pressedAt[id] = performance.now();
   touch.buttons[id] = true;
 }
 
 export function buttonUp(id: ActionId, pointerId: number): void {
   const held = buttonPointers[id];
   held?.delete(pointerId);
-  if (!held || held.size === 0) touch.buttons[id] = false;
+  if (held && held.size > 0) return;
+  const heldFor = performance.now() - (pressedAt[id] ?? -Infinity);
+  if (heldFor >= MIN_TAP_MS) {
+    touch.buttons[id] = false;
+    return;
+  }
+  clearTimeout(pendingRelease[id]);
+  pendingRelease[id] = setTimeout(() => {
+    pendingRelease[id] = undefined;
+    if (!buttonPointers[id] || buttonPointers[id]!.size === 0) touch.buttons[id] = false;
+  }, MIN_TAP_MS - heldFor);
 }
 
 /** Nothing pressed on the screen (steering from the gyro doesn't count). */
@@ -88,6 +126,8 @@ export function releaseAllTouch(): void {
   touch.steerOverride = null;
   for (const id of ACTION_IDS) {
     buttonPointers[id]!.clear();
+    clearTimeout(pendingRelease[id]); // safety beats the minimum tap: release NOW
+    pendingRelease[id] = undefined;
     touch.buttons[id] = false;
   }
 }

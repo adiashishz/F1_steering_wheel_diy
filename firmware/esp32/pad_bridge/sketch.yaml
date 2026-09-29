@@ -1,0 +1,2 @@
+# CDCOnBoot off: this sketch starts USB itself, after setting Sony's VID/PID.
+default_fqbn: esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,USBMode=default,CDCOnBoot=default
