@@ -41,7 +41,7 @@ The server's connection states:
 | `PENDING` | socket open, no `hello` yet | all keys released |
 | `AWAITING_FRESH` | `hello` accepted, waiting for `state` with `seq: 0` | all keys released |
 | `LIVE` | receiving valid state | keys follow state |
-| `TRIPPED` | watchdog fired | all keys released until a new session |
+| `TRIPPED` | watchdog fired | all keys released until **fresh** state arrives (seq newer than anything before the gap) — then straight back to `LIVE`, no new session needed. (The Mac bridge does this since 2026-09-29; `wheel_link` firmware still waits for a new `hello`.) |
 
 ---
 
@@ -168,8 +168,9 @@ These are safety rules, not suggestions (plan.md §13, §19).
 4. **`armed: false` → neutral.**
 5. **Watchdog:** no valid `state` for `watchdogMs` (150 ms) → release every key.
    Check this on a timer, not only when packets arrive — silence produces no packets.
-6. **Apply exclusivity again** (`pedals.ts`, policy `dominant`, threshold 0.05)
-   before mapping. A buggy tablet must not be able to hold throttle and brake.
+6. **Apply exclusivity again** (`pedals.ts`) before mapping. The tablet and the
+   Mac bridge use `allow-both`: throttle and brake pass through independently,
+   like real pedals. The ESP32 keyboard firmware still uses `dominant`, 0.05.
 7. **Map state → keys with the same logic as `keymap.ts`**, same numbers:
    press > 0.15, release < 0.10, min hold 30 ms, min gap 20 ms.
    `releaseAll` ignores min hold. In the pulse steering modes the steer keys
@@ -229,7 +230,7 @@ Firmware notes:
 | Status rate | ~5 Hz | ESP32 |
 | Key press / release thresholds | 0.15 / 0.10 | `keymap.ts` |
 | Min hold / min gap | 30 / 20 ms | `keymap.ts` |
-| Exclusivity | `dominant`, 0.05 | `pedals.ts` |
+| Exclusivity | `allow-both` (tablet, Mac bridge) · `dominant`, 0.05 (ESP32 keyboard firmware) | `pedals.ts` |
 | Default keys | F1 25 PS5 "Keyboard Preset 1": `A` throttle, `Z` brake, `,` / `.` steer left / right; `Space` gearUp, `ShiftLeft` gearDown, `F` drs, `M` ers (Overtake/Boost), `Numpad0` mfd, `T` radio | `keymap.ts` — confirmed on PS5 2026-09-24 |
 
 ## 7. Versioning

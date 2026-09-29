@@ -9,7 +9,9 @@ import { TelemetryPanel } from './ui/debug/TelemetryPanel';
 import { AxisSettings } from './ui/settings/AxisSettings';
 import { AxisScope } from './ui/debug/AxisScope';
 import { DriveScreen } from './ui/drive/DriveScreen';
+import { OUTPUT_LABEL } from './output/WebSocketOutput';
 import { TouchProbe } from './ui/debug/TouchProbe';
+import { LatencyTest } from './ui/debug/LatencyTest';
 import { FullscreenButton } from './ui/FullscreenButton';
 import './App.css';
 
@@ -57,6 +59,7 @@ export function App() {
           </section>
         </div>
         <aside className="panel shell__debug">
+          <LatencyTest />
           <TouchProbe />
           <TelemetryPanel />
         </aside>
@@ -120,16 +123,23 @@ function OutputPill() {
 function EspPill() {
   noteRender();
   const state = useHzValue(runtime.live, 4, () => runtime.esp.link.state);
+  const kind = useHzValue(runtime.live, 4, () => runtime.esp.link.kind);
   const rtt = useRef<HTMLSpanElement>(null);
   useRaf(runtime.live, () => {
+    // Round trips: tablet ↔ Mac (our ping) + the next hop if the bridge knows it (Mac ↔ PS5).
     const ms = runtime.esp.link.rttMs;
-    const text = state === 'live' ? (Number.isFinite(ms) ? ` · ${ms.toFixed(0)} ms` : '') : '';
+    const next = runtime.esp.link.status?.linkRttMs;
+    const hops = Number.isFinite(ms) ? `${ms.toFixed(0)}${next !== undefined ? ` + ${next.toFixed(0)}` : ''} ms` : '';
+    const text = state === 'live' && hops ? ` · ${runtime.esp.link.transport} · ${hops}` : '';
     if (rtt.current && rtt.current.textContent !== text) rtt.current.textContent = text;
   });
   const tone: Tone = state === 'live' ? 'go' : state === 'rejected' ? 'bad' : 'warn';
   return (
-    <span className={`pill pill--${tone}`} title={runtime.esp.link.lastError}>
-      <span className="pill__label">ESP32</span>
+    <span
+      className={`pill pill--${tone}`}
+      title={`${runtime.esp.link.server} · round trips: tablet↔Mac + Mac↔next hop. ${runtime.esp.link.lastError}`}
+    >
+      <span className="pill__label">{OUTPUT_LABEL[kind]}</span>
       <span className="pill__value mono">
         {state}
         <span ref={rtt} />

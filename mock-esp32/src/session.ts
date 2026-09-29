@@ -12,8 +12,8 @@
  * controller-state.md §2:
  *
  *   PENDING ──hello──► AWAITING_FRESH ──state seq 0──► LIVE ──300 ms silence──► TRIPPED
- *      ▲                                                                         │
- *      └──────────────────────────── next hello ◄────────────────────────────────┘
+ *                                                       ▲                        │ (all released)
+ *                                                       └──── fresh state ◄──────┘
  *
  * Outside LIVE every key is released. Stopping always wins: disconnect, bye,
  * disarm and watchdog all call releaseAll(), which ignores min hold.
@@ -92,7 +92,7 @@ export class Device {
    * Set when a DualSense bridge is the real output: status then reports its held
    * buttons instead of the (virtual) keyboard's keys.
    */
-  padStatus: (() => { keys: Record<string, boolean>; steer: number }) | null = null;
+  padStatus: (() => { keys: Record<string, boolean>; steer: number; linkRttMs?: number }) | null = null;
 
   constructor(private readonly printKeys: boolean) {}
 
@@ -183,6 +183,10 @@ export class Device {
         return;
       }
 
+      case 'log':
+        log('tablet', msg.text);
+        return;
+
       case 'output_config': {
         if (ws !== this.socket) {
           this.sendError(ws, 'handshake', 'output_config before hello', false, now);
@@ -219,7 +223,18 @@ export class Device {
       this.sendError(ws, 'stale', `state for session ${s.sessionId.slice(0, 8)}, current is ${this.sessionId.slice(0, 8)}`, false, now);
       return;
     }
-    if (this.state === 'TRIPPED') return; // released until the next hello
+    if (this.state === 'TRIPPED') {
+      // Everything was released when the gap passed WATCHDOG_MS. Over the UDP-like
+      // channel a gap is just lost packets, so FRESH state (newer than anything
+      // before the gap) resumes output at once — no reconnect, no disarm. Stale
+      // packets from before the gap are still thrown away.
+      if (s.seq <= this.lastSeq) {
+        this.dropped++;
+        return;
+      }
+      log('recover', `fresh state after ${Math.round(now - this.lastValidAt)} ms — output follows state again`);
+      this.state = 'LIVE';
+    }
 
     if (this.state === 'AWAITING_FRESH') {
       if (s.seq !== 0) {
@@ -246,8 +261,8 @@ export class Device {
       this.machine.update(NEUTRAL_STATE);
     } else {
       this.armed = true;
-      // The tablet already did this; do it again so a buggy tablet can't hold both pedals.
-      enforceExclusivity(s, 'dominant', DEFAULT_EXCLUSIVITY_THRESHOLD);
+      // Both pedals pass through, like real pedals (the tablet sends exactly what the fingers do).
+      enforceExclusivity(s, 'allow-both', DEFAULT_EXCLUSIVITY_THRESHOLD);
       this.machine.update(s);
       copyInput(s, this.lastInput);
     }
@@ -287,7 +302,7 @@ export class Device {
       this.emit(this.machine.releaseAll(now));
       this.state = 'TRIPPED';
       this.armed = false;
-      log('watchdog', `no valid state for ${Math.round(now - this.lastValidAt)} ms — all keys released, TRIPPED until next hello`);
+      log('watchdog', `no valid state for ${Math.round(now - this.lastValidAt)} ms — all keys released until fresh state arrives`);
       return;
     }
     this.emit(this.machine.tick(now));
@@ -316,6 +331,7 @@ export class Device {
       // With a pad, "duty" is just how far the stick is out; nothing pulses.
       steerDuty: this.padStatus ? Math.min(Math.abs(this.padStatus().steer), 1) : this.machine.steerDuty,
       steerPressesPerSec: this.padStatus ? 0 : this.steerPresses.count(now),
+      ...(this.padStatus?.().linkRttMs !== undefined ? { linkRttMs: this.padStatus().linkRttMs } : {}),
     };
   }
 

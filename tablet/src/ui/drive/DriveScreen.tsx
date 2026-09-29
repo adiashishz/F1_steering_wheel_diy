@@ -62,10 +62,14 @@ function MenuScreen() {
   return (
     <div className="drive menu">
       <div className="menu__side">
-        <ActionButton action="l1" label="L1" className="shoulder" />
+        <div className="menu__shoulders">
+          <ActionButton action="l2" label="L2" className="shoulder" />
+          <ActionButton action="l1" label="L1" className="shoulder" />
+        </div>
         <div className="menu__padwrap">
           <DPad />
         </div>
+        <ActionButton action="l3" label="L3" sub="stick click" className="stick" />
       </div>
       <div className="drive__center">
         <section className="panel drive__panel">
@@ -73,10 +77,17 @@ function MenuScreen() {
         </section>
         <ArmStrip />
         <p className="menu__hint">Menu mode — only these buttons reach the game. ARM to drive.</p>
-        <ActionButton action="pause" label="≡ OPTIONS" sub="pause" className="options" />
+        <div className="menu__system">
+          <ActionButton action="create" label="CREATE" sub="media" className="options" />
+          <ActionButton action="ps" label="PS" className="options options--ps" />
+          <ActionButton action="pause" label="≡ OPTIONS" sub="pause" className="options" />
+        </div>
       </div>
       <div className="menu__side">
-        <ActionButton action="r1" label="R1" className="shoulder" />
+        <div className="menu__shoulders">
+          <ActionButton action="r1" label="R1" className="shoulder" />
+          <ActionButton action="r2" label="R2" className="shoulder" />
+        </div>
         <div className="menu__padwrap">
           <div className="face">
             <ActionButton action="faceTriangle" label="△" className="face__btn face--triangle" />
@@ -85,6 +96,7 @@ function MenuScreen() {
             <ActionButton action="menuSelect" label="✕" sub="select" className="face__btn face--cross" />
           </div>
         </div>
+        <ActionButton action="r3" label="R3" sub="stick click" className="stick" />
       </div>
     </div>
   );
@@ -123,7 +135,7 @@ function ArmStrip() {
         disabled={!armed && !rearm && !ready}
         onClick={() => runtime.control.setArmed(!armed && !rearm)}
       >
-        {armed ? 'DISARM' : rearm ? (ready ? 'LIFT PEDALS' : 'RECONNECTING') : ready ? 'ARM' : busy ? 'IN USE ELSEWHERE' : 'NO ESP32'}
+        {armed ? 'DISARM' : rearm ? (ready ? 'LIFT PEDALS' : 'RECONNECTING') : ready ? 'ARM' : busy ? 'IN USE ELSEWHERE' : 'NOT CONNECTED'}
       </button>
       <button
         type="button"

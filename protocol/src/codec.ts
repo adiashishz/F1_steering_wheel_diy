@@ -20,8 +20,8 @@ import {
   type ServerMessage,
 } from './messages';
 
-/** Anything bigger is rejected before parsing. A state packet is ~200 bytes. */
-export const MAX_MESSAGE_LENGTH = 4096;
+/** Anything bigger is rejected before parsing. A state packet is ~200 bytes; an SDP offer ~1–3 KB. */
+export const MAX_MESSAGE_LENGTH = 16384;
 /** Cap on buttons/actions/keys per message. */
 export const MAX_BUTTONS = 64;
 
@@ -163,6 +163,12 @@ const CLIENT_RULES: Record<ClientMessage['type'], Rules> = {
   output_config: {
     steerPulse,
   },
+  rtc_offer: {
+    sdp: shortStr(12000),
+  },
+  log: {
+    text: shortStr(500),
+  },
   ping: {
     id: nonNegInt,
     timestamp: isNum,
@@ -181,6 +187,9 @@ const SERVER_RULES: Record<ServerMessage['type'], Rules> = {
     maxSendRateHz: inRange(1, 1000),
     serverTime: isNum,
   },
+  rtc_answer: {
+    sdp: shortStr(12000),
+  },
   pong: {
     id: nonNegInt,
     clientTimestamp: isNum,
@@ -195,6 +204,7 @@ const SERVER_RULES: Record<ServerMessage['type'], Rules> = {
     keys: boolRecord,
     steerDuty: optional(inRange(0, 1)),
     steerPressesPerSec: optional((v) => isNum(v) && v >= 0),
+    linkRttMs: optional((v) => isNum(v) && v >= 0),
   },
   error: {
     code: oneOf(ERROR_CODES),

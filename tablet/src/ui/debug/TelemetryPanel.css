@@ -125,3 +125,36 @@
   white-space: pre-wrap;
   pointer-events: none;
 }
+
+/* latency test (LatencyTest) */
+.probe__note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.latency__btn {
+  width: 100%;
+  min-height: 56px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--info);
+  background: #38bdf81f;
+  color: var(--info);
+  font-weight: 700;
+  cursor: pointer;
+}
+.latency__btn:disabled {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: default;
+}
+/* the start marker: whole screen white, above everything */
+.latency-flash {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  z-index: 1000;
+  pointer-events: none;
+}

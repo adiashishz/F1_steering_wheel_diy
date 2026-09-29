@@ -18,7 +18,8 @@ const KEY_NAMES: Record<string, string> = {
 /**
  * The lock-test readout:
  *   big bar     steering being sent (gyro, or a held test chip)
- *   ESP32 line  what the board reports it's actually doing: duty, presses/s, held keys
+ *   Output line what the far end reports it's actually doing (pad: stick + held buttons;
+ *               keyboard: duty, presses/s, held keys)
  *   Link line   drops since load and why the last one happened
  *
  * All written straight to the DOM once per frame — renders once, then never again.
@@ -59,7 +60,7 @@ export function SteerMeter() {
       </div>
       <div className="meter__lines">
         <div>
-          <span className="meter__label">ESP32</span>
+          <span className="meter__label">Output</span>
           <span ref={esp} className="mono" />
         </div>
         <div>
@@ -90,6 +91,11 @@ function espText(): string {
   const held = Object.keys(st.keys)
     .filter((k) => st.keys[k])
     .map((k) => KEY_NAMES[k] ?? k);
+  if (link.kind === 'ps5-direct' || link.kind === 'dualsense') {
+    // A pad: nothing pulses — show how far the stick is out and what's held.
+    const stick = st.steerDuty === undefined ? '—' : `${Math.round(st.steerDuty * 100)}%`;
+    return `stick ${stick} · ${held.length ? held.join(' + ') : 'nothing held'}`;
+  }
   const duty = st.steerDuty === undefined ? '—' : `${Math.round(st.steerDuty * 100)}%`;
   const presses = st.steerPressesPerSec === undefined ? '—' : String(Math.round(st.steerPressesPerSec));
   return `duty ${duty} · ${presses} presses/s · ${held.length ? held.join(' + ') : 'no keys'}`;

@@ -36,7 +36,14 @@ import type { HotStore } from './hotStore';
 import { buildFrame, createFrame, DEFAULT_STALE_SENSOR_MS, type RawInputFrame } from './pipeline';
 import { IntervalStats, RateMeter } from './telemetry';
 import type { ConfigStore } from '../config/configStore';
-import { DRIVE_ACTIONS, MENU_ACTIONS, releaseAllTouch, touchIsNeutral, type TouchState } from '../input/touchState';
+import {
+  DRIVE_ACTIONS,
+  MENU_ACTIONS,
+  onTouchChange,
+  releaseAllTouch,
+  touchIsNeutral,
+  type TouchState,
+} from '../input/touchState';
 import type { OutputDevice } from '../output/OutputDevice';
 import type { SensorSource, SensorStatus } from '../sensors/types';
 
@@ -145,6 +152,9 @@ export class ControlLoop {
   private readonly steeringAxis: AxisProcessor;
   private readonly pitchAxis: AxisProcessor;
   private readonly unsubscribeConfig: () => void;
+  private readonly unsubscribeTouch: () => void;
+  /** performance.now() of the last tick (scheduled or kicked). */
+  private lastTickAt = 0;
   /** Was the gyro fresh last tick? Used to spot "readings just came back". */
   private wasFresh = false;
   /** Sensor id last tick — a change means the source was switched. */
@@ -172,6 +182,7 @@ export class ControlLoop {
     this.gyroPedals = cfg.pedals.gyro;
     deps.output.configure({ steerPulse: cfg.steerOutput });
     // Settings changes apply on the next tick. Each change is a new object, so just swap the reference.
+    this.unsubscribeTouch = onTouchChange(this.kick);
     this.unsubscribeConfig = deps.config.subscribe((next, changed) => {
       this.steeringAxis.config = next.steering;
       this.pitchAxis.config = next.pitch;
@@ -197,6 +208,7 @@ export class ControlLoop {
   dispose(): void {
     this.stop();
     this.unsubscribeConfig();
+    this.unsubscribeTouch();
   }
 
   get isRunning(): boolean {
@@ -241,12 +253,26 @@ export class ControlLoop {
     return true;
   }
 
-  private readonly tick = (now: number, dt: number, stalled: boolean): void => {
+  /**
+   * Run one extra tick RIGHT NOW (from a touch handler): the press / release goes
+   * out immediately instead of waiting for a timer Chrome may be deferring.
+   */
+  private readonly kick = (): void => {
+    if (!this.loop.isRunning) return;
+    const now = performance.now();
+    this.tick(now, Math.max(now - this.lastTickAt, 0), false, true);
+  };
+
+  private readonly tick = (now: number, dt: number, stalled: boolean, kicked = false): void => {
     const { sensor, live } = this.deps;
+    this.lastTickAt = now;
     const f = buildFrame(this.frame, sensor, now, dt, stalled, this.deps.staleSensorMs ?? DEFAULT_STALE_SENSOR_MS);
 
-    this.rate.mark(now);
-    this.gaps.mark(now);
+    // Kicked ticks are extra: keep them out of the loop-rate / jitter stats.
+    if (!kicked) {
+      this.rate.mark(now);
+      this.gaps.mark(now);
+    }
 
     const v = live.peek();
     v.ticks = this.loop.stats.ticks;
@@ -306,9 +332,10 @@ export class ControlLoop {
     // Touch pads always; gyro pedals (forward = throttle, back = brake) only if switched on.
     const tiltThrottle = this.gyroPedals && v.pedalTilt > 0 ? v.pedalTilt : 0;
     const tiltBrake = this.gyroPedals && v.pedalTilt < 0 ? -v.pedalTilt : 0;
+    // Each pad is exactly what its finger does: both held → both sent, like real pedals.
     s.throttle = Math.max(touch.throttle, tiltThrottle);
     s.brake = Math.max(touch.brake, tiltBrake);
-    enforceExclusivity(s, 'dominant', DEFAULT_EXCLUSIVITY_THRESHOLD);
+    enforceExclusivity(s, 'allow-both', DEFAULT_EXCLUSIVITY_THRESHOLD);
     if (menu) {
       s.steering = 0;
       s.throttle = 0;
